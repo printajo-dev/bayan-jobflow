@@ -18,7 +18,8 @@ flowchart LR
   S8 -->|handover evidence| C((Job closed))
   S3 -. rejected / design change .-> S2
   S7 -. fail: rework .-> R{{Responsible stage<br/>new occurrence}}
-  R -. after rework .-> S7
+  R -. after rework, straight back .-> S7
+  S2 -. after rework, straight back .-> S3
 ```
 
 | # | Stage | Department | Completion gate (all must hold) |
@@ -39,12 +40,14 @@ Rules enforced by the engine:
   re-ordering cannot bypass it).
 - PRO "return to Design" requires a reason, keeps the rejection, the
   submission and all earlier artwork, and creates Design occurrence n+1. A new
-  artwork version then needs a new customer approval, and PRO resubmits in
-  Government Approval occurrence n+1.
+  artwork version then needs a new customer approval; when Design completes,
+  the job goes straight back to Government Approval (occurrence n+1) and PRO
+  resubmits.
 - QC fail → inspector records defects and selects the responsible stage
   (Print, Wrap, or Design); a correction item is created and assigned to that
-  department; that stage reopens as a new occurrence; re-inspection is a new
-  `qc_inspections` row; Delivery stays locked until a pass.
+  department; only that stage reopens as a new occurrence; when it completes
+  the job goes straight back to QC; re-inspection is a new `qc_inspections`
+  row; Delivery stays locked until a pass.
 - The job closes only when Delivery completes.
 
 ## Signage (template `SG`, v1)
@@ -73,6 +76,7 @@ flowchart LR
 
 ## Engine behaviour (both)
 
+- Job Number is typed in by Sales from the ERP invoice; it must be unique.
 - Stages are sequential; tasks inside a stage may run in parallel or have
   dependencies.
 - A stage completes only through `POST /jobs/:id/stages/:stageId/complete`,
@@ -85,9 +89,11 @@ flowchart LR
   idempotent (unique idempotency keys), so a retried event never creates
   duplicate stages, tasks or notifications.
 
-## Rework scope (default, needs confirmation — see open question Q3)
+## Rework scope (confirmed)
 
-When a stage is reopened by a return or QC fail, the engine re-runs **from the
-target stage forward** up to the stage that returned it. The leader of each
-intermediate stage may mark its new occurrence `skipped – not affected` with a
-reason (e.g. a Wrap fix after QC fail does not require a new Print).
+When a stage is returned (PRO rejection) or a QC inspection fails, **only the
+reopened stage runs again** as a new occurrence. The stages in between are not
+re-run. When the reopened stage completes, the workflow goes straight back to
+the stage that returned it, which also gets a new occurrence. If the rework
+really affects an intermediate stage, the leader of the returning stage can
+return the job to that stage as a separate, recorded return.

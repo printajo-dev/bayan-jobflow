@@ -14,7 +14,7 @@ flowchart LR
     PC[Office PCs / tablets<br/>browser]
   end
   subgraph Server[Ubuntu 24.04 server — Docker Compose]
-    Caddy[Caddy<br/>:443 internal TLS]
+    Caddy[Caddy<br/>:443 internal TLS<br/>cert for server IP]
     Web[web<br/>static React build]
     API[api<br/>NestJS REST /api/v1 + Socket.IO]
     Worker[worker<br/>outbox relay + BullMQ jobs]
@@ -47,7 +47,7 @@ on an internal Docker network with no published ports.
 | Auth | Server-side sessions in PostgreSQL, HttpOnly + Secure + SameSite=Strict cookie, CSRF token header, Argon2id (ADR 0003) | Easy revocation, no tokens in browser storage |
 | Realtime | Socket.IO with Redis adapter; clients re-fetch from REST on reconnect | Postgres stays authoritative; app still works if Redis/socket drops |
 | Events | Transactional outbox table → worker → BullMQ consumers with idempotency keys (ADR 0004) | Required by spec; no lost or duplicated side effects |
-| HTTPS | Caddy `tls internal` CA, root cert installed on each office PC (ADR 0005) | **Browsers only allow microphone access on HTTPS** — voice notes need it |
+| HTTPS | Users open `https://<server LAN IP>`. Caddy `tls internal` issues a certificate for that IP; its root cert is installed once on each office PC (ADR 0005) | **Browsers only allow microphone access on HTTPS** — voice notes need it. No DNS needed |
 | Files | Local filesystem, random storage keys, metadata in Postgres, streamed through permission-checked endpoints | Spec section 12 |
 | Backups | `pg_dump` (custom format) daily + Restic for files and dumps, weekly copy to external disk | Spec section 20 |
 
@@ -142,8 +142,8 @@ Install steps (to be scripted in Phase 7, tested in Phase 1 on a VM):
 2. Create `/srv/company-data/*` with documented ownership; copy `.env.example` → `.env`, generate secrets.
 3. `docker compose build` (or load pre-built images with `docker load` for offline installs).
 4. `docker compose up -d`; `migrate.sh`; `seed-admin.sh` creates the first System Administrator interactively.
-5. Caddy issues an internal certificate for e.g. `jobflow.bayan.lan`; export the Caddy root CA and install it on each PC (guide per Windows/macOS).
-6. Internal DNS (router or Pi-hole/dnsmasq) points `jobflow.bayan.lan` at the server; fallback is a hosts-file entry.
+5. Give the server a **static LAN IP** (or a DHCP reservation on the router), set it as `JOBFLOW_HOST` in `.env`. Caddy issues an internal certificate for that IP; export the Caddy root CA and install it on each PC (guide for Windows/macOS/Android tablets).
+6. Users bookmark `https://<server IP>`. If an internal DNS name is added later, it is appended to `JOBFLOW_HOST` and Caddy covers both.
 7. Firewall: UFW allows 22 from admin IPs and 443/80 from LAN subnet. Because Docker-published ports bypass UFW's INPUT chain, Caddy binds to the server's LAN IP only and rules are added to the `DOCKER-USER` chain; verified from a second LAN machine with `nmap`.
 8. All services use `restart: unless-stopped` and health checks; Docker starts on boot.
 9. Backups via systemd timers: daily `pg_dump`, nightly Restic of files + dumps, weekly copy to external disk; monthly restore test into a scratch Compose project.

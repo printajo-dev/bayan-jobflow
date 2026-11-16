@@ -17,7 +17,7 @@ may do*. They are stored and edited separately.
 
 | Area | Keys |
 |---|---|
-| Jobs | `job.view`, `job.create`, `job.edit_brief`, `job.cancel`, `job.view_customer` |
+| Jobs | `job.view`, `job.create`, `job.edit_number`, `job.edit_brief`, `job.cancel`, `job.view_customer` |
 | Workflow | `stage.view`, `stage.complete`, `stage.hold`, `stage.return`, `stage.reopen`, `stage.exception` |
 | Tasks | `task.view`, `task.create`, `task.assign`, `task.update_own`, `task.update_any`, `task.set_deadline` |
 | Design | `artwork.view`, `artwork.upload`, `correction_round.manage`, `customer_approval.record` |
@@ -40,23 +40,23 @@ Leaders get the employee rights plus the leader-only rows.
 | Capability | Admin | Mgmt | Sales | Design | PRO | Logistic | Production | Install | Quality |
 |---|---|---|---|---|---|---|---|---|---|
 | View jobs / workflow timeline | F | F | F | D | D | D | D | D | D |
-| Create job, edit brief | F | V | F | – | – | – | – | – | – |
+| Create job (manual Job Number), edit brief | F | V | F | – | – | – | – | – | – |
 | View customer details | F | F | F | – | – | – | – | – | – |
-| Complete / hold / return own stage (leader) | F | configurable | D | D | D | D | D | D | D |
-| Reopen stage, record exception | F | configurable | – | – | – | – | – | – | – |
+| Complete / hold / return own stage (leader) | F | – | D | D | D | D | D | D | D |
+| Reopen stage, record exception | F | – | – | – | – | – | – | – | – |
 | Assign employees, set internal deadline (leader) | F | – | D | D | D | D | D | D | D |
 | Update own tasks | – | – | A | A | A | A | A | A | A |
 | Upload artwork, correction rounds | – | V | V | D | V | – | V | V | V |
 | Record customer approval | – | – | F | – | – | – | – | – | – |
 | Authority applications | – | V | – | – | D | – | – | – | – |
-| Mark authority Not Required | F | configurable | – | – | leader | – | – | – | – |
+| Mark authority Not Required | F | – | – | – | leader | – | – | – | – |
 | Vehicle schedule, delivery | – | V | V | – | – | D | V | V | – |
 | Production orders / logs | – | V | – | – | – | – | D | V | V |
 | Installation orders / logs | – | V | – | – | – | V | – | D | V |
 | QC inspection, pass/fail | – | V | – | – | – | – | – | – | D |
-| Department channel | – | configurable | own | own | own | own | own | own | own |
+| Department channel | – | V | own | own | own | own | own | own | own |
 | General channel | F | F | job members | job members | … | … | … | … | … |
-| Create correction | F | F | D | D | D | D | D | D | D |
+| Create correction | F | – | D | D | D | D | D | D | D |
 | Resolve assigned correction | – | – | A | A | A | A | A | A | A |
 | Reports | F | F | D | D | D | D | D | D | D |
 | Users, roles, templates, settings, audit, backups | F | – | – | – | – | – | – | – | – |
@@ -64,8 +64,10 @@ Leaders get the employee rights plus the leader-only rows.
 Notes:
 - PRO has **no** Design permissions; Design has **no** authority permissions
   (acceptance tests 6–7 call the API directly to prove it).
-- "configurable" means the Management role is seeded with view-only and the
-  admin can grant more; every grant is audited.
+- Management is **view-only**: all jobs, stages, channels (read), reports and
+  exports. No business actions.
+- Authority **Not Required** can be marked by the System Administrator and the
+  PRO Leader; both need a mandatory reason and are audited.
 - Cross-department participants are added per channel or per stage by a
   leader with `channel.add_participant`; they do not gain department-wide access.
 - Admin manages the system but is not given business actions (e.g. recording

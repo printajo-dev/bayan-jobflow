@@ -104,7 +104,7 @@ erDiagram
 
 System tables: `notifications`, `notification_preferences`,
 `workflow_outbox_events`, `automation_rules`, `automation_runs`, `audit_logs`,
-`system_settings`, `sessions`, `job_number_sequences`, `upload_sessions`.
+`system_settings`, `sessions`, `upload_sessions`.
 
 ## Key relationships and rules
 
@@ -113,15 +113,18 @@ System tables: `notifications`, `notification_preferences`,
   immutable (enforced in service + DB trigger). `job_workflows.template_version_id`
   pins the exact version, so editing a template never changes active jobs.
 - **Stage occurrences.** `department_stages(job_workflow_id, template_stage_id,
-  occurrence_no)` is unique. Rework creates `occurrence_no + 1`; earlier
+  occurrence_no)` is unique. Rework creates `occurrence_no + 1` of the
+  reopened stage only (`returned_from_stage_id` records who sent it back); earlier
   occurrences keep their status, tasks, files and comments. Status:
   `pending | active | on_hold | completed | returned | skipped | cancelled`.
 - **Transitions.** Every status change writes a `workflow_transitions` row
   (from, to, actor, reason) and a `workflow_outbox_events` row in the same
   transaction.
-- **Job Number.** `jobs.job_number` unique; generated from
-  `job_number_sequences(service_type_id, year)` with `SELECT … FOR UPDATE`, so
-  numbers are gap-free per year and never duplicated.
+- **Job Number.** Entered manually by Sales and matches the ERP invoice
+  number (ADR 0006). Stored trimmed and upper-cased in `jobs.job_number` with a
+  unique index, so the same number cannot be used twice. Optional
+  admin-configurable format check (regex in `system_settings`). Changing a Job
+  Number after creation needs `job.edit_number`, a reason and an audit entry.
 - **Brief.** `job_briefs` has typed columns common to both services plus a
   `service_details jsonb` validated against a per-service Zod schema (vehicle
   details vs. site/dimensions). Customer data lives only in optional
