@@ -7,8 +7,13 @@ and customer approval, PRO / government approval, vehicle scheduling,
 production, installation, QC, delivery, department discussion channels with
 voice notes, formal corrections, notifications, dashboards and audit history.
 
-**Status:** Phase 0 (discovery and design). No application code yet. The design
-below must be reviewed before Phase 1 starts.
+**Status:** Phase 1 (foundation) — secure sign-in, users, departments, roles
+and permissions, audit log, Docker deployment. Jobs and workflows start in
+Phase 2. See [CHANGELOG.md](CHANGELOG.md).
+
+Install on the office server: [docs/install-ubuntu.md](docs/install-ubuntu.md).
+Administer users and roles: [docs/admin-guide.md](docs/admin-guide.md).
+Develop and test: [docs/development.md](docs/development.md).
 
 | Doc | Contents |
 |---|---|

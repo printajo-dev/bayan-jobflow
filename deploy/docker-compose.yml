@@ -1,0 +1,113 @@
+# Bayan JobFlow — production stack for one Ubuntu Server 24.04 machine.
+# Run from the deploy/ directory:  docker compose up -d
+# Only Caddy publishes ports. PostgreSQL and Redis are on an internal network
+# with no route to the LAN or the internet.
+name: bayan-jobflow
+
+x-api-env: &api-env
+  NODE_ENV: production
+  TZ: ${TZ:-Asia/Dubai}
+  DATABASE_URL: postgresql://jobflow:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/jobflow
+  REDIS_URL: redis://:${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}@redis:6379
+  COOKIE_SECURE: "true"
+  TRUST_PROXY: "true"
+  SESSION_IDLE_MINUTES: ${SESSION_IDLE_MINUTES:-720}
+  SESSION_ABSOLUTE_HOURS: ${SESSION_ABSOLUTE_HOURS:-168}
+  LOGIN_MAX_FAILURES: ${LOGIN_MAX_FAILURES:-5}
+  LOGIN_LOCK_MINUTES: ${LOGIN_LOCK_MINUTES:-15}
+
+services:
+  postgres:
+    image: postgres:17.12-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: jobflow
+      POSTGRES_USER: jobflow
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      TZ: ${TZ:-Asia/Dubai}
+    volumes:
+      - ${DATA_ROOT:-/srv/company-data}/postgres:/var/lib/postgresql/data
+    shm_size: 256mb
+    networks: [backend]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jobflow -d jobflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    stop_grace_period: 60s
+
+  redis:
+    image: redis:8.2.11-bookworm
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD}"]
+    volumes:
+      - ${DATA_ROOT:-/srv/company-data}/redis:/data
+    networks: [backend]
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" --no-auth-warning ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+
+  # Applies database migrations and reference data, then exits. Runs on every
+  # `docker compose up`; both steps are idempotent.
+  migrate:
+    image: bayan-jobflow-api:${JOBFLOW_VERSION:-local}
+    build: { context: .., target: api }
+    restart: "no"
+    command: ["sh", "-c", "npm run --silent migrate:deploy && node dist/cli/seed.js"]
+    environment: *api-env
+    networks: [backend]
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  api:
+    image: bayan-jobflow-api:${JOBFLOW_VERSION:-local}
+    restart: unless-stopped
+    environment: *api-env
+    networks: [backend]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/v1/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    stop_grace_period: 30s
+
+  worker:
+    image: bayan-jobflow-api:${JOBFLOW_VERSION:-local}
+    restart: unless-stopped
+    command: ["node", "dist/worker.js"]
+    environment: *api-env
+    networks: [backend]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    stop_grace_period: 30s
+
+  caddy:
+    image: bayan-jobflow-web:${JOBFLOW_VERSION:-local}
+    build: { context: .., target: web }
+    restart: unless-stopped
+    environment:
+      JOBFLOW_HOST: ${JOBFLOW_HOST:?set JOBFLOW_HOST in .env}
+    ports:
+      - "${BIND_IP:?set BIND_IP in .env}:443:443"
+      - "${BIND_IP}:80:80"
+    volumes:
+      # Holds Caddy's internal root CA. Losing it means re-installing the
+      # certificate on every PC, so it is part of the backup.
+      - ${DATA_ROOT:-/srv/company-data}/caddy/data:/data
+      - ${DATA_ROOT:-/srv/company-data}/caddy/config:/config
+    networks: [backend, edge]
+    depends_on:
+      api: { condition: service_healthy }
+
+networks:
+  backend:
+    internal: true
+  edge: {}
