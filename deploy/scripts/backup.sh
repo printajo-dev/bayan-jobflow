@@ -14,7 +14,9 @@ backup_db() {
   ts="$(date +%Y%m%d-%H%M%S)"; out="$dir/jobflow-$ts.dump"
   mkdir -p "$dir"; chmod 700 "$BACKUP_ROOT" "$dir"
   log "Database backup → $out"
-  dc exec -T postgres pg_dump -U jobflow -d jobflow --format=custom --compress=6 > "$out.partial"
+  if ! dc exec -T postgres pg_dump -U jobflow -d jobflow --format=custom --compress=6 > "$out.partial"; then
+    rm -f "$out.partial"; die "pg_dump failed"
+  fi
   # A dump that pg_restore cannot read is not a backup.
   dc exec -T postgres pg_restore --list < "$out.partial" > /dev/null || die "pg_restore cannot read the new dump"
   mv "$out.partial" "$out"; chmod 600 "$out"
@@ -26,6 +28,9 @@ backup_db() {
 restic_init() {
   [[ -s "$RESTIC_PASSWORD_FILE" ]] || die "Restic password file $RESTIC_PASSWORD_FILE is missing (run deploy/scripts/install-backups.sh)"
   if ! restic cat config >/dev/null 2>&1; then
+    if [[ -e "$RESTIC_REPOSITORY/config" ]]; then
+      die "Cannot open the Restic repository: wrong password in $RESTIC_PASSWORD_FILE, or the repository is damaged"
+    fi
     log "Creating Restic repository $RESTIC_REPOSITORY"
     restic init >/dev/null
   fi
@@ -63,14 +68,21 @@ backup_offsite() {
 }
 
 run() { # run <status-name> <function>
-  local name="$1" fn="$2" errfile; errfile="$(mktemp)"
-  if ( "$fn" ) 2> >(tee "$errfile" >&2); then
+  local name="$1" fn="$2" errfile rc
+  errfile="$(mktemp)"
+  # Not inside an `if`: bash ignores `set -e` in conditions, which would let a
+  # failed step continue and be recorded as a success.
+  set +e
+  ( set -e; "$fn" ) 2> >(tee "$errfile" >&2)
+  rc=$?
+  set -e
+  if [[ $rc -eq 0 ]]; then
     record_status "$name" true
   else
     record_status "$name" false "$(grep -v '^\s*$' "$errfile" | tail -n 1 | cut -c1-300)"
-    rm -f "$errfile"; return 1
   fi
   rm -f "$errfile"
+  return $rc
 }
 
 case "${1:-}" in

@@ -1,3 +1,4 @@
+import { rm } from 'node:fs/promises';
 import { type INestApplication, StandardSchemaValidationPipe } from '@nestjs/common';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import cookieParser from 'cookie-parser';
@@ -51,6 +52,16 @@ export function configureApp(app: INestApplication): void {
       crossOriginResourcePolicy: { policy: 'same-origin' },
     }),
   );
+  // Uploads are written to FILES_ROOT/tmp before validation runs. Whatever
+  // happens to the request (rejected input, error, aborted upload), the temp
+  // file is removed when the response ends; stored files were already moved.
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    res.on('close', () => {
+      const file = (req as Request & { file?: { path?: string } }).file;
+      if (file?.path) void rm(file.path, { force: true }).catch(() => undefined);
+    });
+    next();
+  });
   app.use(cookieParser());
   app.use(sameOriginMiddleware);
   app.setGlobalPrefix(API_PREFIX, { exclude: [] });

@@ -1,4 +1,6 @@
 import 'dotenv/config';
+import { readdir, rm, stat } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
 import { Emitter } from '@socket.io/redis-emitter';
 import { createClient } from 'redis';
 import { config } from './config/config.js';
@@ -16,9 +18,24 @@ import { WORKER_HEARTBEAT_KEY } from './system/system.js';
  * nothing is lost while Redis is down. Stops cleanly on SIGTERM/SIGINT.
  */
 const cfg = config();
+
+async function sweepTmp(dir: string, olderThanMs: number): Promise<number> {
+  let removed = 0;
+  for (const name of await readdir(dir).catch(() => [] as string[])) {
+    const path = join(dir, name);
+    const st = await stat(path).catch(() => null);
+    if (st?.isFile() && Date.now() - st.mtimeMs > olderThanMs) {
+      await rm(path, { force: true });
+      removed++;
+    }
+  }
+  return removed;
+}
 const prisma = createPrismaClient();
 const log = (level: 'log' | 'error' | 'warn', msg: string) =>
   (level === 'error' ? console.error : console.log)(JSON.stringify({ level, context: 'Worker', msg, time: new Date().toISOString() }));
+
+process.on('unhandledRejection', (reason) => log('error', `Unhandled rejection: ${reason instanceof Error ? (reason.stack ?? reason.message) : String(reason)}`));
 
 let push: Push | null = null;
 let redis: { quit: () => Promise<unknown> } | null = null;
@@ -48,6 +65,7 @@ log('log', 'Worker started');
 let lastStuckCheck = 0;
 let lastReminder = 0;
 let lastHeartbeat = 0;
+let lastTmpSweep = 0;
 while (!stopping) {
   try {
     if (Date.now() - lastStuckCheck > 60_000) {
@@ -59,6 +77,12 @@ while (!stopping) {
       const value = { at: new Date().toISOString() };
       await prisma.systemSetting.upsert({ where: { key: WORKER_HEARTBEAT_KEY }, create: { key: WORKER_HEARTBEAT_KEY, value }, update: { value } });
       lastHeartbeat = Date.now();
+    }
+    if (Date.now() - lastTmpSweep > 60 * 60_000) {
+      // Safety net for upload temp files left by a crash mid-request.
+      const removed = await sweepTmp(join(resolve(cfg.FILES_ROOT), 'tmp'), 6 * 60 * 60_000);
+      if (removed) log('log', `Removed ${removed} stale upload temp file(s)`);
+      lastTmpSweep = Date.now();
     }
     if (Date.now() - lastReminder > 15 * 60_000) {
       const n = await notifier.taskReminders();

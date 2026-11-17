@@ -16,6 +16,8 @@ const logger = new ConsoleLogger({
   logLevels: levels.slice(0, levels.indexOf(cfg.LOG_LEVEL) + 1),
 });
 
+// A stray rejected promise must not take the whole API down for every user.
+process.on('unhandledRejection', (reason) => logger.error(`Unhandled rejection: ${reason instanceof Error ? (reason.stack ?? reason.message) : String(reason)}`, 'Process'));
 const app = await NestFactory.create(AppModule, { logger });
 configureApp(app);
 if (cfg.API_DOCS) {

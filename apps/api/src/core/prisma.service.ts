@@ -8,14 +8,16 @@ export type Tx = Omit<
   '$connect' | '$disconnect' | '$on' | '$transaction' | '$extends'
 >;
 
-export function createPrismaClient(url = config().DATABASE_URL): PrismaClient {
-  return new PrismaClient({ adapter: new PrismaPg({ connectionString: url, max: 10 }) });
+/** Worker and CLI tools: a small pool is plenty. */
+export function createPrismaClient(url = config().DATABASE_URL, max = 5): PrismaClient {
+  return new PrismaClient({ adapter: new PrismaPg({ connectionString: url, max }) });
 }
 
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleDestroy {
   constructor() {
-    super({ adapter: new PrismaPg({ connectionString: config().DATABASE_URL, max: 10 }) });
+    // Per API instance; PostgreSQL allows 100 connections in total.
+    super({ adapter: new PrismaPg({ connectionString: config().DATABASE_URL, max: config().DB_POOL_MAX }) });
   }
 
   async onModuleDestroy(): Promise<void> {

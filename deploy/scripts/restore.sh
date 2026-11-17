@@ -91,9 +91,11 @@ cmd_production() {
   log "Safety backup of the current state"
   "$(dirname "$0")/backup.sh" db || die "Safety backup failed; nothing was changed"
 
-  local target="$WORK/production"
+  local target="$WORK/production" with_files=0
+  rm -rf "$target"   # never reuse files left by an earlier, interrupted restore
   if [[ -z "$dump" ]]; then
     restore_snapshot "$snap" "$target"
+    with_files=1
     dump="$(latest_dump_in "$target")"; [[ -n "$dump" ]] || die "No database dump in the snapshot"
   fi
   [[ -f "$dump" ]] || die "Dump $dump not found"
@@ -106,7 +108,7 @@ cmd_production() {
     -c "DROP DATABASE jobflow" -c "CREATE DATABASE jobflow OWNER jobflow" >/dev/null
   dc exec -T postgres pg_restore -U jobflow -d jobflow --no-owner --exit-on-error < "$dump"
 
-  if [[ -d "$target$DATA_ROOT/files" ]]; then
+  if [[ $with_files -eq 1 && -d "$target$DATA_ROOT/files" ]]; then
     log "Restoring uploaded files"
     rsync -a --delete "$target$DATA_ROOT/files/" "$DATA_ROOT/files/"
     chown -R 1000:1000 "$DATA_ROOT/files"
@@ -126,12 +128,17 @@ case "${1:-}" in
   test)
     shift
     errfile="$(mktemp)"
-    if out=$(cmd_test "$@" 2> >(tee "$errfile" >&2)); then
+    # Outside any `if` so that `set -e` applies inside the test.
+    set +e
+    out=$( set -e; cmd_test "$@" 2> >(tee "$errfile" >&2) )
+    rc=$?
+    set -e
+    if [[ $rc -eq 0 ]]; then
       echo "$out"; record_status restore_test true "$(tail -n 1 <<<"$out")"
     else
-      record_status restore_test false "$(grep -v '^\s*$' "$errfile" | tail -n 1 | cut -c1-300)"; rm -f "$errfile"; exit 1
+      record_status restore_test false "$(grep -v '^\s*$' "$errfile" | tail -n 1 | cut -c1-300)"
     fi
-    rm -f "$errfile" ;;
+    rm -f "$errfile"; exit $rc ;;
   production) shift; cmd_production "$@" ;;
   *) sed -n '2,18p' "$0"; exit 2 ;;
 esac

@@ -257,6 +257,9 @@ export class JobsService {
 
   async updateBrief(id: string, raw: unknown, p: Principal, meta: ActionMeta): Promise<JobDetailDto> {
     await this.prisma.$transaction(async (tx) => {
+      // Same lock as stage completion, so a brief edit cannot slip in while the
+      // brief.complete gate is being evaluated.
+      await tx.$queryRaw`SELECT id FROM job_workflows WHERE job_id = ${id}::uuid FOR UPDATE`;
       const facts = await this.authorize(id, p, 'editBrief', tx);
       const parsed = briefSchemas(facts.serviceTypeCode).draft.safeParse(raw);
       if (!parsed.success) throw new BadRequestException(formatIssues(parsed.error));

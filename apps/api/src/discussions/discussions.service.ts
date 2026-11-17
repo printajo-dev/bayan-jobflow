@@ -165,6 +165,8 @@ export class DiscussionsService implements OnModuleInit {
         await this.audit.record(tx, meta, { action: 'discussion.participant_removed', entityType: 'job', entityId: ch.jobId, summary: `Participant removed from the ${this.channelName(ch)} channel` });
       }
     });
+    // Stop live updates now if they can no longer read the channel.
+    await this.realtime.revalidateUser(userId).catch(() => undefined);
   }
 
   // ------------------------------------------------------------ messages
@@ -248,7 +250,8 @@ export class DiscussionsService implements OnModuleInit {
           idempotencyKey: `discussion.mention.created:${created.id}`,
         });
       }
-      if (parentId && parentAuthor && parentAuthor !== p.userId) {
+      // Only tell the parent's author if they can still read this channel.
+      if (parentId && parentAuthor && parentAuthor !== p.userId && (await this.usersWhoCanView(tx, ch, [parentAuthor])).length > 0) {
         await this.outbox.enqueue(tx, {
           type: 'discussion.message.replied',
           aggregateType: 'job',

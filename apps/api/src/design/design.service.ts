@@ -150,6 +150,12 @@ export class DesignService {
       facts = await this.assertView(jobId, p);
       if (facts.status !== 'OPEN') throw new ConflictException('The job is not open');
       if (!(await this.canUpload(this.prisma, jobId, p))) throw new ForbiddenException('Only the Design Team can upload artwork');
+      if (correctionRoundId) {
+        // Checked again inside the transaction; this avoids storing a file for a request that will fail.
+        const r = await this.prisma.correctionRound.findUnique({ where: { id: correctionRoundId } });
+        if (!r || r.jobId !== jobId) throw new BadRequestException('Correction round not found');
+        if (r.resolvedAt) throw new ConflictException(`Correction round ${r.roundNo} is already resolved`);
+      }
     } catch (e) {
       await this.files.discard(upload);
       throw e;
@@ -187,6 +193,9 @@ export class DesignService {
         idempotencyKey: `artwork.version.uploaded:${v.id}`,
       });
       await this.discussions.systemMessage(tx, jobId, await this.designDepartment(tx, jobId), `Artwork version ${versionNo} uploaded${versionNo > 1 ? ' — it needs a new customer approval' : ''}.`);
+    }).catch(async (e: unknown) => {
+      await this.files.purge(stored.id).catch(() => undefined);
+      throw e;
     });
     return this.get(jobId, p);
   }

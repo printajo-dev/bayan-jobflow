@@ -24,8 +24,39 @@ export class AuthService {
     private readonly principals: PrincipalLoader,
   ) {}
 
-  async login(input: LoginInput, ctx: LoginContext): Promise<IssuedSession> {
+  /**
+   * Counts a failed password atomically (parallel guesses cannot all read the
+   * same old count) and locks the account at LOGIN_MAX_FAILURES.
+   */
+  private async recordFailure(user: { id: string; username: string; status: string }, passwordOk: boolean, ctx: LoginContext): Promise<boolean> {
     const cfg = config();
+    return this.prisma.$transaction(async (tx) => {
+      let lock = false;
+      let failures = 0;
+      if (!passwordOk) {
+        const rows = await tx.$queryRaw<{ n: number }[]>`
+          UPDATE users SET failed_login_count = failed_login_count + 1 WHERE id = ${user.id}::uuid RETURNING failed_login_count AS n`;
+        failures = Number(rows[0]?.n ?? 0);
+        lock = failures >= cfg.LOGIN_MAX_FAILURES;
+        if (lock) {
+          await tx.user.update({ where: { id: user.id }, data: { failedLoginCount: 0, lockedUntil: new Date(Date.now() + cfg.LOGIN_LOCK_MINUTES * 60_000) } });
+        }
+      }
+      await this.audit.record(tx, { ...ctx, actorId: null }, {
+        action: lock ? 'auth.account_locked' : 'auth.login_failed',
+        entityType: 'user',
+        entityId: user.id,
+        summary: lock
+          ? `Account ${user.username} locked after ${failures} failed attempts`
+          : user.status !== 'ACTIVE'
+            ? `Login attempt for disabled account ${user.username}`
+            : `Failed login for ${user.username}`,
+      });
+      return lock;
+    });
+  }
+
+  async login(input: LoginInput, ctx: LoginContext): Promise<IssuedSession> {
     const user = await this.prisma.user.findUnique({ where: { username: input.username } });
     if (!user) {
       await verifyAgainstDummy(input.password);
@@ -49,28 +80,7 @@ export class AuthService {
 
     const ok = await verifyPassword(user.passwordHash, input.password);
     if (!ok || user.status !== 'ACTIVE') {
-      const failures = user.failedLoginCount + 1;
-      const lock = ok ? false : failures >= cfg.LOGIN_MAX_FAILURES;
-      await this.prisma.$transaction(async (tx) => {
-        await tx.user.update({
-          where: { id: user.id },
-          data: ok
-            ? {}
-            : lock
-              ? { failedLoginCount: 0, lockedUntil: new Date(now.getTime() + cfg.LOGIN_LOCK_MINUTES * 60_000) }
-              : { failedLoginCount: failures },
-        });
-        await this.audit.record(tx, { ...ctx, actorId: null }, {
-          action: lock ? 'auth.account_locked' : 'auth.login_failed',
-          entityType: 'user',
-          entityId: user.id,
-          summary: lock
-            ? `Account ${user.username} locked after ${failures} failed attempts`
-            : user.status !== 'ACTIVE'
-              ? `Login attempt for disabled account ${user.username}`
-              : `Failed login for ${user.username}`,
-        });
-      });
+      await this.recordFailure(user, ok, ctx);
       throw new UnauthorizedException(INVALID);
     }
 
@@ -111,6 +121,12 @@ export class AuthService {
   async changePassword(userId: string, input: ChangePasswordInput, ctx: LoginContext): Promise<IssuedSession> {
     const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
     if (!(await verifyPassword(user.passwordHash, input.currentPassword))) {
+      // Wrong guesses count towards the lockout like sign-in attempts; at the
+      // limit every session of the account ends (a stolen session cannot keep guessing).
+      if (await this.recordFailure(user, false, ctx)) {
+        await this.prisma.$transaction((tx) => this.sessions.revokeAllForUser(tx, userId));
+        throw new UnauthorizedException('Too many wrong passwords. The account is locked; sign in again later.');
+      }
       throw new BadRequestException('Current password is incorrect');
     }
     if (input.currentPassword === input.newPassword) {

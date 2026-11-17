@@ -13,6 +13,7 @@ import { AuditService } from '../audit/audit.service.js';
 import { OutboxService } from '../outbox/outbox.service.js';
 import type { ActionMeta } from '../access/decorators.js';
 import { hashPassword } from '../auth/password.js';
+import { RealtimeService } from '../realtime/realtime.service.js';
 import { SessionService } from '../auth/session.service.js';
 import { toUserDto, userDtoInclude } from './user.mapper.js';
 import type { Prisma } from '../generated/prisma/client.js';
@@ -30,6 +31,7 @@ export class UsersService {
     private readonly audit: AuditService,
     private readonly outbox: OutboxService,
     private readonly sessions: SessionService,
+    private readonly realtime: RealtimeService,
   ) {}
 
   async list(q: ListUsers): Promise<Paginated<UserDto>> {
@@ -103,7 +105,7 @@ export class UsersService {
   }
 
   async update(id: string, input: UpdateUserInput, meta: ActionMeta): Promise<UserDto> {
-    return this.prisma.$transaction(async (tx) => {
+    const dto = await this.prisma.$transaction(async (tx) => {
       const before = await this.get(id, tx);
       if (input.status === 'DISABLED' && before.status !== 'DISABLED') {
         if (id === meta.actorId) throw new BadRequestException('You cannot disable your own account');
@@ -133,6 +135,9 @@ export class UsersService {
       });
       return after;
     });
+    // A disabled user's open tabs stop receiving live updates immediately.
+    if (input.status === 'DISABLED') this.realtime.disconnectUser(id);
+    return dto;
   }
 
   async setRoles(id: string, roleIds: string[], meta: ActionMeta): Promise<UserDto> {
@@ -189,7 +194,7 @@ export class UsersService {
   /** Admin reset: the user must choose a new password at next sign-in. */
   async resetPassword(id: string, newPassword: string, meta: ActionMeta): Promise<UserDto> {
     const passwordHash = await hashPassword(newPassword);
-    return this.prisma.$transaction(async (tx) => {
+    const dto = await this.prisma.$transaction(async (tx) => {
       const user = await this.get(id, tx);
       await tx.user.update({
         where: { id },
@@ -204,6 +209,8 @@ export class UsersService {
       });
       return this.get(id, tx);
     });
+    this.realtime.disconnectUser(id);
+    return dto;
   }
 
   async unlock(id: string, meta: ActionMeta): Promise<UserDto> {
@@ -232,6 +239,10 @@ export class UsersService {
 
   /** There must always be at least one active System Administrator. */
   private async assertNotLastAdmin(tx: Tx, userId: string): Promise<void> {
+    // Serialise administrator removals: two admins disabling each other at the
+    // same moment must not both succeed. The lock is held until commit, and the
+    // count below then sees the other transaction's result.
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('jobflow.last-admin-guard'))`;
     const others = await tx.user.count({
       where: {
         id: { not: userId },

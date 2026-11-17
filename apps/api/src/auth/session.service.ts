@@ -77,12 +77,22 @@ export class SessionService {
       return null;
     }
     if (now.getTime() - session.lastSeenAt.getTime() > TOUCH_INTERVAL_MS) {
-      await this.prisma.session.update({
+      // updateMany: if a logout or an administrator ended the session in the
+      // meantime, this is a sign-out (401), not a "record not found" error.
+      const { count } = await this.prisma.session.updateMany({
         where: { id: sessionId },
         data: { lastSeenAt: now, expiresAt: this.nextExpiry(session.createdAt, now) },
       });
+      if (count === 0) return null;
     }
     return { sessionId, userId: session.userId, csrfToken: session.csrfToken };
+  }
+
+  /** Is the session still valid? Unlike resolve(), never extends it (used to re-check open sockets). */
+  async peek(token: string): Promise<{ userId: string } | null> {
+    if (!/^[A-Za-z0-9_-]{20,100}$/.test(token)) return null;
+    const session = await this.prisma.session.findUnique({ where: { id: hashToken(token) }, select: { userId: true, expiresAt: true } });
+    return session && session.expiresAt > new Date() ? { userId: session.userId } : null;
   }
 
   async revoke(db: Tx, sessionId: string): Promise<void> {

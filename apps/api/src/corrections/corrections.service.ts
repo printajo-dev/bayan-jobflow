@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import type { z } from 'zod';
 import type { CorrectionDto, CorrectionStatus, createCorrectionSchema, resolveCorrectionSchema, updateCorrectionSchema } from '@jobflow/shared';
+import { visibleJobsWhere } from '../jobs/job-access.js';
 import { PrismaService, type Tx } from '../core/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { OutboxService } from '../outbox/outbox.service.js';
@@ -50,7 +51,8 @@ export class CorrectionsService {
 
   async mine(p: Principal): Promise<CorrectionDto[]> {
     const rows = await this.prisma.correctionItem.findMany({
-      where: { assignedToId: p.userId, status: { not: 'RESOLVED' } },
+      // Only on jobs the user can still see (they may have changed department).
+      where: { assignedToId: p.userId, status: { not: 'RESOLVED' }, job: visibleJobsWhere(p) },
       include,
       orderBy: [{ deadline: { sort: 'asc', nulls: 'last' } }, { createdAt: 'asc' }],
       take: 100,

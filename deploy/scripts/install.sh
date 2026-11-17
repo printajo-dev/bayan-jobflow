@@ -31,11 +31,17 @@ sudo chmod 750 "${DATA_ROOT}/files"
 if ! grep -q '^JOBFLOW_RELEASE=' .env; then echo "JOBFLOW_RELEASE=$(git -C .. describe --tags --always)" >> .env; fi
 set -a; source .env; set +a
 
-echo "Building images…"
-docker compose build
+if docker image inspect "bayan-jobflow-api:${JOBFLOW_VERSION:-local}" >/dev/null 2>&1 \
+  && docker image inspect "bayan-jobflow-web:${JOBFLOW_VERSION:-local}" >/dev/null 2>&1 \
+  && [[ "${JOBFLOW_REBUILD:-0}" != 1 ]]; then
+  echo "Using the images already loaded (offline bundle); set JOBFLOW_REBUILD=1 to build instead."
+else
+  echo "Building images (needs internet)…"
+  docker compose build
+fi
 
 echo "Starting services…"
-docker compose up -d
+docker compose up -d --no-build
 docker compose ps
 
 cat <<MSG

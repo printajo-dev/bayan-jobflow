@@ -142,6 +142,8 @@ export class TemplatesService {
 
   saveDraft(versionId: string, input: SaveVersion, meta: ActionMeta): Promise<TemplateVersionDto> {
     return this.prisma.$transaction(async (tx) => {
+      // One change at a time per version (save vs publish vs delete).
+      await tx.$queryRaw`SELECT id FROM workflow_template_versions WHERE id = ${versionId}::uuid FOR UPDATE`;
       const v = await tx.workflowTemplateVersion.findUnique({ where: { id: versionId }, include: { template: true } });
       if (!v) throw new NotFoundException('Template version not found');
       if (v.status !== 'DRAFT') throw new ConflictException('Only draft versions can be edited. Create a new draft instead.');
@@ -166,6 +168,8 @@ export class TemplatesService {
   /** Publishes a draft; the previously published version is retired (jobs using it keep it). */
   publish(versionId: string, meta: ActionMeta): Promise<TemplateVersionDto> {
     return this.prisma.$transaction(async (tx) => {
+      // One change at a time per version (save vs publish vs delete).
+      await tx.$queryRaw`SELECT id FROM workflow_template_versions WHERE id = ${versionId}::uuid FOR UPDATE`;
       const v = await tx.workflowTemplateVersion.findUnique({
         where: { id: versionId },
         include: { template: true, stages: true },
@@ -198,6 +202,8 @@ export class TemplatesService {
 
   deleteDraft(versionId: string, meta: ActionMeta): Promise<void> {
     return this.prisma.$transaction(async (tx) => {
+      // One change at a time per version (save vs publish vs delete).
+      await tx.$queryRaw`SELECT id FROM workflow_template_versions WHERE id = ${versionId}::uuid FOR UPDATE`;
       const v = await tx.workflowTemplateVersion.findUnique({ where: { id: versionId }, include: { template: true } });
       if (!v) throw new NotFoundException('Template version not found');
       if (v.status !== 'DRAFT') throw new ConflictException('Only drafts can be deleted');

@@ -133,6 +133,9 @@ export class AuthorityService {
         if (next === 'NOT_REQUIRED') throw new BadRequestException('Use "Mark Not Required" for that');
         if (!AUTHORITY_TRANSITIONS[cur.status].includes(next)) throw new ConflictException(`An application cannot move from ${label(cur.status)} to ${label(next)}`);
         if (cur.status === 'NOT_REQUIRED' && !a.notRequired) throw new ForbiddenException('Only the PRO Leader or an administrator can revoke Not Required');
+        // Cancelling takes an approval out of the Government Approval gate, the
+        // same effect as Not Required, so it needs the same authority.
+        if ((next === 'CANCELLED' || cur.status === 'CANCELLED') && !a.notRequired) throw new ForbiddenException('Only the PRO Leader or an administrator can cancel or reopen an approval');
         const now = new Date();
         if (next === 'SUBMITTED') {
           const submittedAt = input.submissionDate ? new Date(input.submissionDate) : now;
@@ -236,7 +239,7 @@ export class AuthorityService {
     if (!a.manage) throw new ForbiddenException('Only the PRO Section can record payments');
     await this.prisma.$transaction(async (tx) => {
       if (input.receiptFileId) {
-        const link = await tx.jobFile.findFirst({ where: { jobId: app.jobId, fileId: input.receiptFileId, purpose: 'AUTHORITY', addedById: p.userId } });
+        const link = await tx.jobFile.findFirst({ where: { jobId: app.jobId, fileId: input.receiptFileId, purpose: 'AUTHORITY', addedById: p.userId, removedAt: null } });
         if (!link) throw new BadRequestException('Upload the receipt first');
       }
       await tx.authorityPayment.create({
@@ -300,7 +303,9 @@ export class AuthorityService {
       payments: r.payments.map((x) => ({ id: x.id, amount: Number(x.amount), paidAt: x.paidAt.toISOString(), reference: x.reference, receiptFileId: x.receiptFileId, recordedBy: name(x.recordedById) })),
       history: r.history.map((h) => ({ from: h.fromStatus, to: h.toStatus, actor: name(h.actorId), note: h.note, at: h.createdAt.toISOString() })),
       createdAt: r.createdAt.toISOString(),
-      allowedStatuses: manage ? AUTHORITY_TRANSITIONS[r.status].filter((s) => s !== 'PENDING_PREPARATION' || r.status !== 'NOT_REQUIRED' || notRequired) : [],
+      allowedStatuses: manage
+        ? AUTHORITY_TRANSITIONS[r.status].filter((s) => notRequired || !(s === 'CANCELLED' || r.status === 'CANCELLED' || (s === 'PENDING_PREPARATION' && r.status === 'NOT_REQUIRED')))
+        : [],
     }));
   }
 }

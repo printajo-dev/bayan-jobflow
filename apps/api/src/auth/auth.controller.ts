@@ -61,6 +61,8 @@ export class AuthController {
   @AllowPasswordChangePending()
   @Post('change-password')
   @HttpCode(200)
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { ttl: 60_000, limit: config().LOGIN_RATE_PER_MINUTE } })
   async changePassword(
     @Body({ schema: changePasswordSchema }) body: ChangePasswordInput,
     @CurrentPrincipal() principal: Principal,

@@ -137,14 +137,35 @@ export class FilesService {
       const target = this.pathFor(storageKey);
       await mkdir(dirname(target), { recursive: true, mode: 0o750 });
       await rename(upload.path, target);
-      const file = await this.prisma.file.create({
-        data: { storageKey, originalName, mimeType: mime, extension: ext, size: BigInt(upload.size), sha256, durationSec, uploadedById: meta.actorId },
-      });
-      await this.prisma.jobFile.create({ data: { jobId, fileId: file.id, purpose, addedById: meta.actorId } });
+      let file;
+      try {
+        file = await this.prisma.$transaction(async (tx) => {
+          const f = await tx.file.create({
+            data: { storageKey, originalName, mimeType: mime, extension: ext, size: BigInt(upload.size), sha256, durationSec, uploadedById: meta.actorId },
+          });
+          await tx.jobFile.create({ data: { jobId, fileId: f.id, purpose, addedById: meta.actorId } });
+          return f;
+        });
+      } catch (e) {
+        await rm(target, { force: true });
+        throw e;
+      }
       return { id: file.id, originalName, mimeType: mime, size: upload.size, sha256, durationSec };
     } finally {
       if (upload) await rm(upload.path, { force: true });
     }
+  }
+
+  /**
+   * Undoes store() when the business transaction that should use the file
+   * fails afterwards: removes the rows and the file, so nothing is left that
+   * could be downloaded by id.
+   */
+  async purge(fileId: string): Promise<void> {
+    const file = await this.prisma.file.findUnique({ where: { id: fileId } });
+    if (!file) return;
+    await this.prisma.$transaction([this.prisma.jobFile.deleteMany({ where: { fileId } }), this.prisma.file.delete({ where: { id: fileId } })]);
+    await rm(this.pathFor(file.storageKey), { force: true });
   }
 
   /** Removes a temporary upload that will not be stored (e.g. permission denied). */
@@ -178,6 +199,8 @@ export class FilesService {
   async removeJobFile(jobId: string, fileId: string, p: Principal, meta: ActionMeta): Promise<void> {
     const facts = await this.jobs.authorize(jobId, p, 'removeFile');
     await this.prisma.$transaction(async (tx) => {
+      // Brief attachments feed the brief.attachments gate: take the stage-completion lock.
+      await tx.$queryRaw`SELECT id FROM job_workflows WHERE job_id = ${jobId}::uuid FOR UPDATE`;
       const link = await tx.jobFile.findUnique({ where: { jobId_fileId: { jobId, fileId } }, include: { file: true } });
       if (!link || link.removedAt || link.purpose !== 'BRIEF') throw new NotFoundException('File not found');
       await tx.jobFile.update({ where: { id: link.id }, data: { removedAt: new Date(), removedById: meta.actorId } });

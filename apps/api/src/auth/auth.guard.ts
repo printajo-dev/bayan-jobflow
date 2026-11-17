@@ -21,6 +21,7 @@ import { PrismaService } from '../core/prisma.service.js';
 import { SystemService } from '../system/system.js';
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+const GLOBAL_ONLY = new Set<PermissionKey>(['user.manage', 'role.manage', 'department.manage', 'template.manage', 'settings.manage', 'audit.view', 'outbox.manage']);
 
 /**
  * Global guard. Deny by default: every route needs a valid session unless it
@@ -79,7 +80,9 @@ export class AuthGuard implements CanActivate {
     }
 
     const required = this.reflector.getAllAndOverride<PermissionKey[]>(REQUIRED_PERMISSIONS, targets) ?? [];
-    const missing = required.filter((p) => !principal.has(p));
+    // System-wide administration rights only count when granted globally: a
+    // department-scoped role carrying them must not unlock global screens.
+    const missing = required.filter((p) => (GLOBAL_ONLY.has(p) ? !principal.hasGlobal(p) : !principal.has(p)));
     if (missing.length > 0) {
       throw new ForbiddenException('You do not have permission to perform this action');
     }

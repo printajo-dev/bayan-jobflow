@@ -971,6 +971,7 @@ model CorrectionItem {
 
   @@index([jobId])
   @@index([assignedToId, status])
+  @@index([departmentId, status])
   @@map("correction_items")
 }
 
@@ -1018,6 +1019,7 @@ model Notification {
 
   @@unique([userId, eventKey])
   @@index([userId, readAt])
+  @@index([userId, createdAt(sort: Desc)])
   @@map("notifications")
 }
 

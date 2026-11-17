@@ -30,8 +30,8 @@ export function ReportsPage() {
     queryFn: () => get<ReportListItem[]>('/reports'),
   });
   const [key, setKey] = useState<string | null>(null);
-  const [from, setFrom] = useState(iso(new Date(Date.now() - 90 * 86_400_000)));
-  const [to, setTo] = useState(iso(new Date()));
+  const [from, setFrom] = useState(() => iso(new Date(Date.now() - 90 * 86_400_000)));
+  const [to, setTo] = useState(() => iso(new Date()));
   const [group, setGroup] = useState<'month' | 'week'>('month');
   const selected = key ?? list.data?.[0]?.key ?? null;
   const qs = toQuery({ from, to, group });

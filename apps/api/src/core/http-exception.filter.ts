@@ -57,6 +57,18 @@ export class HttpExceptionFilter implements ExceptionFilter {
         return { statusCode: 404, error: 'Not Found', message: 'Record not found' };
       }
     }
+    // Protection triggers (append-only history, published templates, submitted
+    // QC) raise SQLSTATE 42501. That is a conflict with the record's state, not
+    // a server fault, e.g. a draft saved while it is being published.
+    if (isProtectedRowError(exception)) {
+      return { statusCode: 409, error: 'Conflict', message: 'This record is locked and can no longer be changed. Reload the page.' };
+    }
     return { statusCode: 500, error: 'Internal Server Error', message: 'Unexpected error' };
   }
+}
+
+function isProtectedRowError(e: unknown): boolean {
+  if (!(e instanceof Prisma.PrismaClientKnownRequestError || e instanceof Prisma.PrismaClientUnknownRequestError)) return false;
+  const text = `${e.message} ${JSON.stringify((e as { meta?: unknown }).meta ?? {})}`;
+  return /42501|is append-only|cannot be (changed|deleted)/.test(text);
 }

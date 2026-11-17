@@ -110,7 +110,9 @@ function DraftInspection({ jobId, ins, quality, onDone }: { jobId: string; ins: 
     },
     onError,
   });
-  const set = (i: number, patchRow: Partial<(typeof rows)[number]>) => setRows(rows.map((r, j) => (j === i ? { ...r, ...patchRow } : r)));
+  // Functional update: an upload finishing later must not overwrite edits made meanwhile.
+  const set = (i: number, patch: (row: (typeof rows)[number]) => Partial<(typeof rows)[number]>) =>
+    setRows((prev) => prev.map((r, j) => (j === i ? { ...r, ...patch(r) } : r)));
   const canDecide = quality.allowedActions.includes('decide');
   return (
     <Card withBorder>
@@ -126,7 +128,7 @@ function DraftInspection({ jobId, ins, quality, onDone }: { jobId: string; ins: 
             <SegmentedControl
               size="xs"
               value={rows[i]!.result ?? ''}
-              onChange={(v) => set(i, { result: (v || null) as QcResult | null })}
+              onChange={(v) => set(i, () => ({ result: (v || null) as QcResult | null }))}
               data={[
                 { value: 'PASS', label: 'Pass' },
                 { value: 'FAIL', label: 'Fail' },
@@ -134,14 +136,17 @@ function DraftInspection({ jobId, ins, quality, onDone }: { jobId: string; ins: 
               ]}
               aria-label={`Result for ${r.label}`}
             />
-            <TextInput size="xs" w={200} placeholder="Comment" value={rows[i]!.comment} onChange={(e) => set(i, { comment: e.currentTarget.value })} aria-label={`Comment for ${r.label}`} />
+            <TextInput size="xs" w={200} placeholder="Comment" value={rows[i]!.comment} onChange={(e) => {
+                const comment = e.currentTarget.value;
+                set(i, () => ({ comment }));
+              }} aria-label={`Comment for ${r.label}`} />
             <FileButton
               accept="image/*,application/pdf"
               onChange={async (f) => {
                 if (!f) return;
                 try {
                   const up = await uploadWithProgress<{ id: string }>(`/jobs/${jobId}/qc-files`, f, f.name);
-                  set(i, { fileIds: [...rows[i]!.fileIds, up.id], names: [...rows[i]!.names, f.name] });
+                  set(i, (row) => ({ fileIds: [...row.fileIds, up.id], names: [...row.names, f.name] }));
                 } catch (e) {
                   onError(e);
                 }
@@ -179,7 +184,7 @@ function DraftInspection({ jobId, ins, quality, onDone }: { jobId: string; ins: 
 
 function FailModal({ ins, quality, rows, onClose, onDone, beforeFail }: { ins: QcInspectionDto; quality: QualityDto; rows: { result: QcResult | null; comment: string }[]; onClose: () => void; onDone: (d: QualityDto) => void; beforeFail: () => Promise<unknown> }) {
   const dir = useDirectory();
-  const failedItems = ins.results.filter((_, i) => rows[i]?.result === 'FAIL').map((r, i) => `${r.label}${rows[i]?.comment ? `: ${rows[i]!.comment}` : ''}`);
+  const failedItems = ins.results.flatMap((r, i) => (rows[i]?.result === 'FAIL' ? [`${r.label}${rows[i]?.comment ? `: ${rows[i]!.comment}` : ''}`] : []));
   const [defects, setDefects] = useState(failedItems.join('\n'));
   const [target, setTarget] = useState<string | null>(quality.returnTargets[0]?.key ?? null);
   const [assignee, setAssignee] = useState<string | null>(null);

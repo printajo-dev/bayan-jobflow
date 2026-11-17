@@ -32,7 +32,8 @@ export const AUTHORITY_TRANSITIONS: Record<AuthorityStatus, AuthorityStatus[]> =
   REJECTED: ['SUBMITTED', 'CANCELLED'],
   APPROVED: ['EXPIRED'],
   EXPIRED: ['SUBMITTED', 'CANCELLED'],
-  CANCELLED: [],
+  // Reopen: the PRO Leader or an administrator only (like Not Required).
+  CANCELLED: ['PENDING_PREPARATION'],
 };
 
 export const PAYMENT_STATUSES = ['NOT_DUE', 'PENDING', 'PAID', 'WAIVED'] as const;

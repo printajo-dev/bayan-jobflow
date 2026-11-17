@@ -4,9 +4,10 @@
 #   sudo /srv/bayan-jobflow/deploy/scripts/install-backups.sh
 source "$(dirname "$0")/lib.sh"
 [[ $EUID -eq 0 ]] || die "Run as root (sudo)"
-command -v restic >/dev/null || apt-get install -y restic
-command -v jq >/dev/null || apt-get install -y jq
-command -v rsync >/dev/null || apt-get install -y rsync
+for tool in restic jq rsync; do
+  command -v "$tool" >/dev/null || apt-get install -y "$tool" >/dev/null 2>&1 ||
+    die "$tool is not installed and cannot be downloaded (no internet). Run install-offline.sh from the offline bundle; it installs it."
+done
 
 if [[ ! -s "$RESTIC_PASSWORD_FILE" ]]; then
   umask 077; openssl rand -base64 32 > "$RESTIC_PASSWORD_FILE"

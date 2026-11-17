@@ -16,10 +16,13 @@ declare module 'express-serve-static-core' {
   }
 }
 
-/** Assigns a request id (honouring a sane incoming X-Request-Id) and echoes it. */
+/**
+ * Assigns a server-generated request id and echoes it. Never taken from the
+ * client: the id is part of outbox idempotency keys, and a repeated client
+ * value would silently drop later events.
+ */
 export function requestIdMiddleware(req: Request, res: Response, next: NextFunction): void {
-  const incoming = req.header('x-request-id');
-  req.requestId = incoming && /^[A-Za-z0-9-]{8,64}$/.test(incoming) ? incoming : randomUUID();
+  req.requestId = randomUUID();
   res.setHeader('X-Request-Id', req.requestId);
   next();
 }

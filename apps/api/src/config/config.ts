@@ -8,6 +8,8 @@ const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().default(3000),
   DATABASE_URL: z.string().min(1),
+  /** Database connections per API process. Keep (instances × this) + 15 under PostgreSQL's 100. */
+  DB_POOL_MAX: z.coerce.number().int().min(2).max(80).default(20),
   /** Send cookies with the Secure flag. Must be true behind Caddy (HTTPS). */
   COOKIE_SECURE: bool.default(true),
   SESSION_IDLE_MINUTES: z.coerce.number().int().min(5).default(12 * 60),
