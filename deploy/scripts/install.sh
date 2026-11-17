@@ -24,6 +24,9 @@ fi
 echo "Creating data folders under ${DATA_ROOT} (needs sudo)…"
 sudo mkdir -p "${DATA_ROOT}"/{postgres,redis,caddy/data,caddy/config,files,backups,imports,exports}
 sudo chmod 700 "${DATA_ROOT}/postgres" "${DATA_ROOT}/backups"
+# The API container runs as uid 1000 and must be able to write uploads.
+sudo chown -R 1000:1000 "${DATA_ROOT}/files"
+sudo chmod 750 "${DATA_ROOT}/files"
 
 echo "Building images…"
 docker compose build

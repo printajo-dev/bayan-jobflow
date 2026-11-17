@@ -1,5 +1,38 @@
 # Changelog
 
+## Phase 2 — Jobs and workflow engine (unreleased)
+
+Built
+- Jobs with the manual Job Number (ERP invoice number): unique (case-insensitive,
+  enforced by the database), optional admin-configured format check, correction
+  with reason by Sales Leaders.
+- Job briefs: Vehicle Branding (vehicles, coverage; no customer fields — the
+  schema rejects them) and Signage (site, dimensions, specifications). Drafts can
+  be saved incomplete; the Job Brief stage checks completeness.
+- Brief attachments: content-type sniffing (not browser MIME), allow-list,
+  size limit, random storage keys outside any web root, SHA-256, permission-
+  checked download/preview with access log, sandboxed inline preview.
+- Versioned workflow templates with draft → publish, database-enforced
+  immutability of published versions, one published version per template,
+  admin editor (stages, departments, checks, checklists, return rules).
+- Seeded v1 templates for Vehicle Branding (8 stages) and Signage (5 stages).
+- Workflow engine: gates and required checklists, complete, hold/resume, return
+  for correction (only the reopened stage runs again, then back to the stage
+  that returned it), administrator reopen and complete-with-exception, job
+  cancellation, job closure (VB after Delivery, Signage after QC). Row locking
+  prevents duplicate stages from concurrent or retried requests.
+- Job visibility by department ownership of stages (PRO/Logistic see Vehicle
+  Branding only); hidden jobs and files return 404.
+- Web: job list with filters and pagination, new job form, job page (workflow
+  timeline with actions, brief, files, activity), template editor, settings.
+- OpenAPI document (`docs/api/openapi.json`), optional Swagger UI (`API_DOCS=true`).
+
+Interim
+- Stages whose evidence belongs to later modules (artwork approval, authority
+  approvals, schedule, production, installation, QC, delivery) use required
+  checklist items until those modules ship (ADR 0008).
+
+
 ## Phase 1 — Foundation (unreleased)
 
 Built
@@ -28,7 +61,7 @@ Built
 
 Not yet (planned)
 - Redis is deployed but unused until BullMQ notifications (Phase 3).
-- OpenAPI/Swagger docs (Phase 2). Backup/restore scripts (Phase 7; a manual
+- Backup/restore scripts (Phase 7; a manual
   `pg_dump` command is in the install guide meanwhile).
 
 ## Phase 0 — Discovery and design (unreleased)

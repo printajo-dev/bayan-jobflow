@@ -1,4 +1,4 @@
-# Administrator guide (Phase 1)
+# Administrator guide
 
 Everything here is under **Administration** in the left menu, visible only to
 users whose roles grant the matching permission. The server checks every
@@ -62,3 +62,25 @@ Every sign-in, failed sign-in, lockout, password change/reset and every change
 to users, roles, permissions and departments is recorded with who, when, from
 which IP, and before/after values. Passwords are never recorded. The database
 refuses any change or deletion of audit records.
+
+## Workflow templates
+
+*Administration → Workflow templates* lists the Vehicle Branding and Signage
+templates and their versions.
+
+- **Published** versions are used by new jobs. They cannot be edited.
+- **Retired** versions are still used by the jobs that started on them.
+- To change a workflow, press *New draft version*. The draft starts as a copy of
+  the published version. Edit stages (name, responsible department, description,
+  automatic checks, checklist items), reorder them, add or remove stages, and
+  define which stage may return work to which earlier stage. *Save draft* as
+  often as you like; *Publish* when ready.
+- Publishing never changes running jobs. Only one draft per template exists at
+  a time; *Delete draft* discards it.
+- A stage key (e.g. `design`) is permanent once published; reports use it.
+
+## Settings
+
+*Administration → Settings → Job Number*: optionally set a regular expression
+the Job Number must match (for example `INV-[0-9]{5}`) and an example shown to
+Sales. Leave empty to accept any unique number. Existing jobs are not affected.

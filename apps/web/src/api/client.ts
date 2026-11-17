@@ -57,6 +57,29 @@ export async function api<T>(method: string, path: string, body?: unknown): Prom
   return data as T;
 }
 
+/** Multipart upload of one file (field "file"). */
+export async function upload<T>(path: string, file: File): Promise<T> {
+  const form = new FormData();
+  form.append('file', file);
+  const headers: Record<string, string> = { Accept: 'application/json' };
+  if (csrfToken) headers['X-CSRF-Token'] = csrfToken;
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, { method: 'POST', headers, credentials: 'same-origin', body: form });
+  } catch {
+    throw new ApiError(0, 'Cannot reach the JobFlow server. Check the network connection.');
+  }
+  const data: unknown = await res.json().catch(() => undefined);
+  if (!res.ok) {
+    const err = data as ApiErrorBody | undefined;
+    if (res.status === 401) onUnauthorized?.();
+    if (res.status === 413) throw new ApiError(413, 'The file is too large.', err);
+    throw new ApiError(res.status, messageOf(err, res.status), err);
+  }
+  return data as T;
+}
+
+export const del = <T>(path: string) => api<T>('DELETE', path);
 export const get = <T>(path: string) => api<T>('GET', path);
 export const post = <T>(path: string, body?: unknown) => api<T>('POST', path, body ?? {});
 export const put = <T>(path: string, body: unknown) => api<T>('PUT', path, body);

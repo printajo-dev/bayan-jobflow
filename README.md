@@ -7,9 +7,12 @@ and customer approval, PRO / government approval, vehicle scheduling,
 production, installation, QC, delivery, department discussion channels with
 voice notes, formal corrections, notifications, dashboards and audit history.
 
-**Status:** Phase 1 (foundation) — secure sign-in, users, departments, roles
-and permissions, audit log, Docker deployment. Jobs and workflows start in
-Phase 2. See [CHANGELOG.md](CHANGELOG.md).
+**Status:** Phase 2 — sign-in, users and roles, jobs with the ERP Job Number,
+briefs and attachments, versioned Vehicle Branding and Signage workflows with
+rework, Docker deployment. Tasks, design approvals and discussions come in
+Phase 3. See [CHANGELOG.md](CHANGELOG.md).
+
+Using JobFlow: [docs/user-guide.md](docs/user-guide.md). API: [docs/api/](docs/api/).
 
 Install on the office server: [docs/install-ubuntu.md](docs/install-ubuntu.md).
 Administer users and roles: [docs/admin-guide.md](docs/admin-guide.md).

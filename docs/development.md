@@ -58,6 +58,16 @@ The e2e suite creates and drops the database named in `E2E_DATABASE_URL`
 (default `postgresql://jobflow:jobflow_dev@localhost:5432/jobflow_e2e`), so the
 role needs `CREATEDB`.
 
+## API documentation
+
+`docs/api/openapi.json` is generated from the code (Zod schemas included):
+
+```bash
+cd apps/api && npm run build && node dist/cli/openapi.js ../../docs/api/openapi.json
+```
+
+Set `API_DOCS=true` to serve Swagger UI at `/api/v1/docs` (development only).
+
 ## Database changes
 
 Edit `apps/api/prisma/schema.prisma`, then `npx prisma migrate dev --name <change>`

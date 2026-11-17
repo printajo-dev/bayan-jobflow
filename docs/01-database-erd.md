@@ -102,6 +102,14 @@ erDiagram
   files ||--o{ file_access_logs : ""
 ```
 
+Implemented in Phase 2: `service_types`, `workflow_templates`,
+`workflow_template_versions`, `workflow_template_stages`,
+`workflow_template_checklists`, `workflow_template_transitions`, `jobs`,
+`job_briefs`, `files`, `job_files`, `file_access_logs`, `job_workflows`,
+`department_stages`, `stage_checklist_items`, `workflow_transitions`.
+Deferred to Phase 3 (with tasks): `workflow_template_tasks`,
+`workflow_stage_permissions`, `stage_dependencies` (ADR 0008).
+
 System tables: `notifications`, `notification_preferences`,
 `workflow_outbox_events`, `automation_rules`, `automation_runs`, `audit_logs`,
 `system_settings`, `sessions`, `upload_sessions`.

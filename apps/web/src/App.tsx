@@ -12,6 +12,12 @@ import { DepartmentsPage } from './pages/admin/DepartmentsPage';
 import { RolesPage } from './pages/admin/RolesPage';
 import { RoleDetailPage } from './pages/admin/RoleDetailPage';
 import { AuditPage } from './pages/admin/AuditPage';
+import { TemplatesPage } from './pages/admin/TemplatesPage';
+import { TemplateVersionPage } from './pages/admin/TemplateVersionPage';
+import { SettingsPage } from './pages/admin/SettingsPage';
+import { JobsPage } from './pages/jobs/JobsPage';
+import { NewJobPage } from './pages/jobs/NewJobPage';
+import { JobPage } from './pages/jobs/JobPage';
 
 const PASSWORD_PATH = '/account/password';
 
@@ -40,6 +46,22 @@ export const routes = [
         children: [
           { index: true, element: <HomePage /> },
           { path: PASSWORD_PATH, element: <ChangePasswordPage /> },
+          {
+            element: <RequirePermission permission="job.view" />,
+            children: [
+              { path: '/jobs', element: <JobsPage /> },
+              { path: '/jobs/:id', element: <JobPage /> },
+            ],
+          },
+          { element: <RequirePermission permission="job.create" />, children: [{ path: '/jobs/new', element: <NewJobPage /> }] },
+          {
+            element: <RequirePermission permission="template.manage" />,
+            children: [
+              { path: '/admin/templates', element: <TemplatesPage /> },
+              { path: '/admin/templates/versions/:id', element: <TemplateVersionPage /> },
+            ],
+          },
+          { element: <RequirePermission permission="settings.manage" />, children: [{ path: '/admin/settings', element: <SettingsPage /> }] },
           {
             element: <RequirePermission permission="user.manage" />,
             children: [

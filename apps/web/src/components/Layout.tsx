@@ -10,12 +10,17 @@ interface NavItem {
   permission?: PermissionKey;
 }
 
-const MAIN: NavItem[] = [{ to: '/', label: 'Home' }];
+const MAIN: NavItem[] = [
+  { to: '/', label: 'Home' },
+  { to: '/jobs', label: 'Jobs', permission: 'job.view' },
+];
 
 export const ADMIN_NAV: NavItem[] = [
   { to: '/admin/users', label: 'Users', permission: 'user.manage' },
   { to: '/admin/departments', label: 'Departments', permission: 'department.manage' },
   { to: '/admin/roles', label: 'Roles & permissions', permission: 'role.manage' },
+  { to: '/admin/templates', label: 'Workflow templates', permission: 'template.manage' },
+  { to: '/admin/settings', label: 'Settings', permission: 'settings.manage' },
   { to: '/admin/audit', label: 'Audit log', permission: 'audit.view' },
 ];
 
@@ -75,7 +80,7 @@ export function Layout() {
           </Text>
         ) : (
           <Stack gap={0}>
-            {MAIN.map(link)}
+            {MAIN.filter((i) => !i.permission || can(i.permission)).map(link)}
             {admin.length > 0 && (
               <>
                 <Group px="sm" pt="md" pb={4}>
