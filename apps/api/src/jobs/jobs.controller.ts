@@ -1,4 +1,3 @@
-import { mkdirSync } from 'node:fs';
 import {
   Body,
   Controller,
@@ -14,10 +13,6 @@ import {
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
-import { randomUUID } from 'node:crypto';
-import { join, resolve } from 'node:path';
-import { diskStorage } from 'multer';
 import type { Response } from 'express';
 import { z } from 'zod';
 import {
@@ -36,23 +31,13 @@ import {
 import { type ActionMeta, CurrentPrincipal, Meta } from '../access/decorators.js';
 import type { Principal } from '../access/principal.js';
 import { PrismaService } from '../core/prisma.service.js';
-import { config } from '../config/config.js';
+import { uploadInterceptor } from '../files/upload.js';
 import { WorkflowEngine } from '../workflow/engine.service.js';
 import { FilesService, type StoredUpload } from '../files/files.service.js';
 import { JobsService } from './jobs.service.js';
+import { DiscussionsService } from '../discussions/discussions.service.js';
 
-const tmpDir = join(resolve(config().FILES_ROOT), 'tmp');
-
-const upload = FileInterceptor('file', {
-  storage: diskStorage({
-    destination: (_req, _file, cb) => {
-      mkdirSync(tmpDir, { recursive: true, mode: 0o750 });
-      cb(null, tmpDir);
-    },
-    filename: (_req, _file, cb) => cb(null, randomUUID()),
-  }),
-  limits: { fileSize: config().UPLOAD_MAX_MB * 1024 * 1024, files: 1, fields: 5 },
-});
+const upload = uploadInterceptor();
 
 @Controller('jobs')
 export class JobsController {
@@ -171,7 +156,7 @@ export class JobsController {
     @CurrentPrincipal() p: Principal,
     @Meta() meta: ActionMeta,
   ) {
-    return this.files.addJobFile(id, file, 'BRIEF', p, meta);
+    return this.files.addJobFile(id, file, p, meta);
   }
 
   @Delete(':id/files/:fileId')
@@ -278,7 +263,10 @@ export class JobsController {
 
 @Controller('files')
 export class FilesController {
-  constructor(private readonly files: FilesService) {}
+  constructor(
+    private readonly files: FilesService,
+    private readonly discussions: DiscussionsService,
+  ) {}
 
   @Get(':id/download')
   async download(
@@ -288,7 +276,12 @@ export class FilesController {
     @Meta() meta: ActionMeta,
     @Res({ passthrough: true }) res: Response,
   ): Promise<StreamableFile> {
-    const f = await this.files.openForDownload(id, p, meta, inline === '1');
+    const f = await this.files.openForDownload(id, p, meta, inline === '1', (channelId) =>
+      this.discussions.channelFor(channelId, p).then(
+        () => true,
+        () => false,
+      ),
+    );
     res.set({
       'Cache-Control': 'private, no-store',
       'X-Content-Type-Options': 'nosniff',

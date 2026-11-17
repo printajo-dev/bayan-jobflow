@@ -44,6 +44,9 @@ model Department {
   roleScopes     RoleDepartmentScope[]
   templateStages WorkflowTemplateStage[]
   stages         DepartmentStage[]
+  tasks          Task[]
+  channels       DiscussionChannel[]
+  corrections    CorrectionItem[]
 
   @@map("departments")
 }
@@ -72,6 +75,20 @@ model User {
   filesUploaded     File[]               @relation("FileUploadedBy")
   stagesCompleted   DepartmentStage[]    @relation("StageCompletedBy")
   checklistsChecked StageChecklistItem[] @relation("ChecklistCheckedBy")
+
+  taskAssignments      TaskAssignment[]          @relation("TaskAssignee")
+  taskComments         TaskComment[]             @relation("TaskCommentAuthor")
+  roundsRequested      CorrectionRound[]         @relation("RoundRequestedBy")
+  roundsAssigned       CorrectionRound[]         @relation("RoundDesigner")
+  artworkUploaded      ArtworkVersion[]          @relation("ArtworkUploadedBy")
+  approvalsRecorded    ApprovalRecord[]          @relation("ApprovalRecordedBy")
+  channelMemberships   DiscussionChannelMember[] @relation("ChannelMember")
+  messages             DiscussionMessage[]       @relation("MessageAuthor")
+  mentions             DiscussionMention[]       @relation("MentionedUser")
+  correctionsRequested CorrectionItem[]          @relation("CorrectionRequestedBy")
+  correctionsAssigned  CorrectionItem[]          @relation("CorrectionAssignedTo")
+  notifications        Notification[]            @relation("NotificationUser")
+  notificationSettings NotificationPreference[]  @relation("NotificationPreferenceUser")
 
   @@index([status])
   @@map("users")
@@ -378,11 +395,17 @@ model Job {
   createdAt              DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt              DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  serviceType ServiceType  @relation(fields: [serviceTypeId], references: [id], onDelete: Restrict)
-  createdBy   User?        @relation("JobCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  serviceType ServiceType         @relation(fields: [serviceTypeId], references: [id], onDelete: Restrict)
+  createdBy   User?               @relation("JobCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   brief       JobBrief?
   workflow    JobWorkflow?
   files       JobFile[]
+  tasks       Task[]
+  rounds      CorrectionRound[]
+  artwork     ArtworkVersion[]
+  approvals   ApprovalRecord[]
+  channels    DiscussionChannel[]
+  corrections CorrectionItem[]
 
   @@index([status, serviceTypeId])
   @@index([createdAt])
@@ -415,13 +438,20 @@ model File {
   extension    String    @db.VarChar(20)
   size         BigInt
   sha256       String    @db.Char(64)
+  /// Audio duration in seconds (voice notes only).
+  durationSec  Int?      @map("duration_sec")
   uploadedById String?   @map("uploaded_by_id") @db.Uuid
   createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   deletedAt    DateTime? @map("deleted_at") @db.Timestamptz(3)
 
-  uploadedBy User?           @relation("FileUploadedBy", fields: [uploadedById], references: [id], onDelete: Restrict)
-  jobs       JobFile[]
-  accessLogs FileAccessLog[]
+  uploadedBy  User?                  @relation("FileUploadedBy", fields: [uploadedById], references: [id], onDelete: Restrict)
+  jobs        JobFile[]
+  accessLogs  FileAccessLog[]
+  rounds      CorrectionRoundFile[]  @relation("RoundFile")
+  artwork     ArtworkVersion[]       @relation("ArtworkFile")
+  evidence    ApprovalRecord[]       @relation("ApprovalEvidence")
+  messages    DiscussionAttachment[] @relation("MessageFile")
+  corrections CorrectionFile[]       @relation("CorrectionFile")
 
   @@map("files")
 }
@@ -493,6 +523,8 @@ model DepartmentStage {
   returnReason        String?     @map("return_reason") @db.VarChar(1000)
   holdReason          String?     @map("hold_reason") @db.VarChar(1000)
   exceptionReason     String?     @map("exception_reason") @db.VarChar(1000)
+  /// Department internal deadline, set by the leader (separate from the customer date).
+  internalDeadline    DateTime?   @map("internal_deadline") @db.Date
   createdAt           DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt           DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
 
@@ -504,6 +536,7 @@ model DepartmentStage {
   returnedTo    DepartmentStage[]     @relation("StageReturnedFrom")
   checklist     StageChecklistItem[]
   transitions   WorkflowTransition[]
+  tasks         Task[]
 
   @@unique([jobWorkflowId, templateStageId, occurrenceNo])
   @@index([status, departmentId])
@@ -543,4 +576,443 @@ model WorkflowTransition {
 
   @@index([jobWorkflowId, createdAt])
   @@map("workflow_transitions")
+}
+
+// ============================================================ Phase 3
+
+enum TaskStatus {
+  TODO
+  ASSIGNED
+  IN_PROGRESS
+  WAITING
+  BLOCKED
+  COMPLETED
+  CANCELLED
+}
+
+enum ApprovalMethod {
+  IN_PERSON
+  EMAIL
+  WHATSAPP
+  PHONE
+  SIGNED_FORM
+  OTHER
+}
+
+enum ChannelType {
+  DEPARTMENT
+  GENERAL
+}
+
+enum MessageKind {
+  USER
+  SYSTEM
+}
+
+enum CorrectionStatus {
+  OPEN
+  ASSIGNED
+  IN_PROGRESS
+  WAITING_INFO
+  RESOLVED
+  REOPENED
+}
+
+model Task {
+  id            String      @id @default(uuid(7)) @db.Uuid
+  jobId         String      @map("job_id") @db.Uuid
+  stageId       String      @map("stage_id") @db.Uuid
+  departmentId  String      @map("department_id") @db.Uuid
+  title         String      @db.VarChar(200)
+  description   String?
+  priority      JobPriority @default(NORMAL)
+  status        TaskStatus  @default(TODO)
+  required      Boolean     @default(true)
+  startDate     DateTime?   @map("start_date") @db.Date
+  /// Employee task deadline (separate from the stage's internal deadline and the customer date).
+  dueDate       DateTime?   @map("due_date") @db.Date
+  createdById   String?     @map("created_by_id") @db.Uuid
+  completedAt   DateTime?   @map("completed_at") @db.Timestamptz(3)
+  completedById String?     @map("completed_by_id") @db.Uuid
+  createdAt     DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  job          Job                 @relation(fields: [jobId], references: [id], onDelete: Restrict)
+  stage        DepartmentStage     @relation(fields: [stageId], references: [id], onDelete: Restrict)
+  department   Department          @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  assignments  TaskAssignment[]
+  dependencies TaskDependency[]    @relation("TaskDependsOn")
+  dependents   TaskDependency[]    @relation("TaskDependent")
+  checklist    TaskChecklistItem[]
+  comments     TaskComment[]
+
+  @@index([jobId])
+  @@index([stageId])
+  @@index([departmentId, status])
+  @@index([dueDate])
+  @@map("tasks")
+}
+
+model TaskAssignment {
+  id           String    @id @default(uuid(7)) @db.Uuid
+  taskId       String    @map("task_id") @db.Uuid
+  userId       String    @map("user_id") @db.Uuid
+  assignedById String?   @map("assigned_by_id") @db.Uuid
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  removedAt    DateTime? @map("removed_at") @db.Timestamptz(3)
+  removedById  String?   @map("removed_by_id") @db.Uuid
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Restrict)
+  user User @relation("TaskAssignee", fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([userId])
+  @@index([taskId])
+  @@map("task_assignments")
+}
+
+model TaskDependency {
+  taskId          String @map("task_id") @db.Uuid
+  dependsOnTaskId String @map("depends_on_task_id") @db.Uuid
+
+  task      Task @relation("TaskDependsOn", fields: [taskId], references: [id], onDelete: Cascade)
+  dependsOn Task @relation("TaskDependent", fields: [dependsOnTaskId], references: [id], onDelete: Cascade)
+
+  @@id([taskId, dependsOnTaskId])
+  @@map("task_dependencies")
+}
+
+model TaskChecklistItem {
+  id       String    @id @default(uuid(7)) @db.Uuid
+  taskId   String    @map("task_id") @db.Uuid
+  sequence Int
+  label    String    @db.VarChar(300)
+  doneAt   DateTime? @map("done_at") @db.Timestamptz(3)
+  doneById String?   @map("done_by_id") @db.Uuid
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, sequence])
+  @@map("task_checklist_items")
+}
+
+model TaskComment {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  taskId    String   @map("task_id") @db.Uuid
+  authorId  String?  @map("author_id") @db.Uuid
+  body      String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  task   Task  @relation(fields: [taskId], references: [id], onDelete: Restrict)
+  author User? @relation("TaskCommentAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+
+  @@index([taskId])
+  @@map("task_comments")
+}
+
+model CorrectionRound {
+  id                 String    @id @default(uuid(7)) @db.Uuid
+  jobId              String    @map("job_id") @db.Uuid
+  roundNo            Int       @map("round_no")
+  description        String
+  sourceMessageId    String?   @map("source_message_id") @db.Uuid
+  requestedById      String?   @map("requested_by_id") @db.Uuid
+  assignedDesignerId String?   @map("assigned_designer_id") @db.Uuid
+  deadline           DateTime? @db.Date
+  resolvedAt         DateTime? @map("resolved_at") @db.Timestamptz(3)
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  job              Job                   @relation(fields: [jobId], references: [id], onDelete: Restrict)
+  requestedBy      User?                 @relation("RoundRequestedBy", fields: [requestedById], references: [id], onDelete: Restrict)
+  assignedDesigner User?                 @relation("RoundDesigner", fields: [assignedDesignerId], references: [id], onDelete: Restrict)
+  versions         ArtworkVersion[]
+  files            CorrectionRoundFile[]
+
+  @@unique([jobId, roundNo])
+  @@map("correction_rounds")
+}
+
+model CorrectionRoundFile {
+  roundId String @map("round_id") @db.Uuid
+  fileId  String @map("file_id") @db.Uuid
+
+  round CorrectionRound @relation(fields: [roundId], references: [id], onDelete: Restrict)
+  file  File            @relation("RoundFile", fields: [fileId], references: [id], onDelete: Restrict)
+
+  @@id([roundId, fileId])
+  @@map("correction_round_files")
+}
+
+/// Immutable: a new upload is always a new version; earlier files are never replaced.
+model ArtworkVersion {
+  id                String   @id @default(uuid(7)) @db.Uuid
+  jobId             String   @map("job_id") @db.Uuid
+  versionNo         Int      @map("version_no")
+  fileId            String   @map("file_id") @db.Uuid
+  stageId           String?  @map("stage_id") @db.Uuid
+  correctionRoundId String?  @map("correction_round_id") @db.Uuid
+  notes             String?  @db.VarChar(2000)
+  uploadedById      String?  @map("uploaded_by_id") @db.Uuid
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  job             Job              @relation(fields: [jobId], references: [id], onDelete: Restrict)
+  file            File             @relation("ArtworkFile", fields: [fileId], references: [id], onDelete: Restrict)
+  correctionRound CorrectionRound? @relation(fields: [correctionRoundId], references: [id], onDelete: Restrict)
+  uploadedBy      User?            @relation("ArtworkUploadedBy", fields: [uploadedById], references: [id], onDelete: Restrict)
+  approvals       ApprovalRecord[]
+
+  @@unique([jobId, versionNo])
+  @@map("artwork_versions")
+}
+
+/// Customer approval recorded manually by Sales against one exact artwork version. Append-only.
+model ApprovalRecord {
+  id               String         @id @default(uuid(7)) @db.Uuid
+  jobId            String         @map("job_id") @db.Uuid
+  artworkVersionId String         @map("artwork_version_id") @db.Uuid
+  approverName     String         @map("approver_name") @db.VarChar(150)
+  approverRole     String?        @map("approver_role") @db.VarChar(150)
+  method           ApprovalMethod
+  approvedAt       DateTime       @map("approved_at") @db.Timestamptz(3)
+  notes            String?        @db.VarChar(2000)
+  evidenceFileId   String?        @map("evidence_file_id") @db.Uuid
+  recordedById     String?        @map("recorded_by_id") @db.Uuid
+  createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  job            Job            @relation(fields: [jobId], references: [id], onDelete: Restrict)
+  artworkVersion ArtworkVersion @relation(fields: [artworkVersionId], references: [id], onDelete: Restrict)
+  evidenceFile   File?          @relation("ApprovalEvidence", fields: [evidenceFileId], references: [id], onDelete: Restrict)
+  recordedBy     User?          @relation("ApprovalRecordedBy", fields: [recordedById], references: [id], onDelete: Restrict)
+
+  @@index([artworkVersionId])
+  @@map("approval_records")
+}
+
+model DiscussionChannel {
+  id           String      @id @default(uuid(7)) @db.Uuid
+  jobId        String      @map("job_id") @db.Uuid
+  type         ChannelType
+  departmentId String?     @map("department_id") @db.Uuid
+  createdAt    DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  job        Job                       @relation(fields: [jobId], references: [id], onDelete: Restrict)
+  department Department?               @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  members    DiscussionChannelMember[]
+  messages   DiscussionMessage[]
+  pins       DiscussionPin[]
+
+  @@unique([jobId, departmentId])
+  @@index([jobId])
+  @@map("discussion_channels")
+}
+
+/// Explicitly authorised cross-department participants.
+model DiscussionChannelMember {
+  channelId String   @map("channel_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  addedById String?  @map("added_by_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  channel DiscussionChannel @relation(fields: [channelId], references: [id], onDelete: Restrict)
+  user    User              @relation("ChannelMember", fields: [userId], references: [id], onDelete: Restrict)
+
+  @@id([channelId, userId])
+  @@map("discussion_channel_members")
+}
+
+model DiscussionMessage {
+  id              String      @id @default(uuid(7)) @db.Uuid
+  channelId       String      @map("channel_id") @db.Uuid
+  jobId           String      @map("job_id") @db.Uuid
+  parentMessageId String?     @map("parent_message_id") @db.Uuid
+  stageId         String?     @map("stage_id") @db.Uuid
+  kind            MessageKind @default(USER)
+  authorId        String?     @map("author_id") @db.Uuid
+  body            String      @default("")
+  editedAt        DateTime?   @map("edited_at") @db.Timestamptz(3)
+  deletedAt       DateTime?   @map("deleted_at") @db.Timestamptz(3)
+  deletedById     String?     @map("deleted_by_id") @db.Uuid
+  createdAt       DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  channel     DiscussionChannel       @relation(fields: [channelId], references: [id], onDelete: Restrict)
+  parent      DiscussionMessage?      @relation("MessageReplies", fields: [parentMessageId], references: [id], onDelete: Restrict)
+  replies     DiscussionMessage[]     @relation("MessageReplies")
+  author      User?                   @relation("MessageAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+  attachments DiscussionAttachment[]
+  mentions    DiscussionMention[]
+  reactions   DiscussionReaction[]
+  receipts    DiscussionReadReceipt[]
+  edits       DiscussionMessageEdit[]
+  pins        DiscussionPin[]
+
+  @@index([channelId, createdAt])
+  @@index([parentMessageId])
+  @@map("discussion_messages")
+}
+
+model DiscussionAttachment {
+  messageId   String  @map("message_id") @db.Uuid
+  fileId      String  @map("file_id") @db.Uuid
+  isVoice     Boolean @default(false) @map("is_voice")
+  durationSec Int?    @map("duration_sec")
+
+  message DiscussionMessage @relation(fields: [messageId], references: [id], onDelete: Restrict)
+  file    File              @relation("MessageFile", fields: [fileId], references: [id], onDelete: Restrict)
+
+  @@id([messageId, fileId])
+  @@map("discussion_attachments")
+}
+
+model DiscussionMention {
+  messageId String @map("message_id") @db.Uuid
+  userId    String @map("user_id") @db.Uuid
+
+  message DiscussionMessage @relation(fields: [messageId], references: [id], onDelete: Restrict)
+  user    User              @relation("MentionedUser", fields: [userId], references: [id], onDelete: Restrict)
+
+  @@id([messageId, userId])
+  @@map("discussion_mentions")
+}
+
+model DiscussionReaction {
+  messageId String   @map("message_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  emoji     String   @db.VarChar(16)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  message DiscussionMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@id([messageId, userId, emoji])
+  @@map("discussion_reactions")
+}
+
+model DiscussionReadReceipt {
+  messageId String   @map("message_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  readAt    DateTime @default(now()) @map("read_at") @db.Timestamptz(3)
+
+  message DiscussionMessage @relation(fields: [messageId], references: [id], onDelete: Restrict)
+
+  @@id([messageId, userId])
+  @@index([userId])
+  @@map("discussion_read_receipts")
+}
+
+model DiscussionPin {
+  channelId  String   @map("channel_id") @db.Uuid
+  messageId  String   @map("message_id") @db.Uuid
+  pinnedById String?  @map("pinned_by_id") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  channel DiscussionChannel @relation(fields: [channelId], references: [id], onDelete: Restrict)
+  message DiscussionMessage @relation(fields: [messageId], references: [id], onDelete: Restrict)
+
+  @@id([channelId, messageId])
+  @@map("discussion_pins")
+}
+
+/// Previous content of edited or deleted messages (append-only).
+model DiscussionMessageEdit {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  messageId    String   @map("message_id") @db.Uuid
+  previousBody String   @map("previous_body")
+  action       String   @db.VarChar(10)
+  editedById   String?  @map("edited_by_id") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  message DiscussionMessage @relation(fields: [messageId], references: [id], onDelete: Restrict)
+
+  @@index([messageId])
+  @@map("discussion_message_edits")
+}
+
+model CorrectionItem {
+  id              String           @id @default(uuid(7)) @db.Uuid
+  jobId           String           @map("job_id") @db.Uuid
+  departmentId    String           @map("department_id") @db.Uuid
+  stageId         String?          @map("stage_id") @db.Uuid
+  channelId       String?          @map("channel_id") @db.Uuid
+  sourceMessageId String?          @map("source_message_id") @db.Uuid
+  title           String           @db.VarChar(200)
+  description     String
+  requestedById   String?          @map("requested_by_id") @db.Uuid
+  assignedToId    String?          @map("assigned_to_id") @db.Uuid
+  priority        JobPriority      @default(NORMAL)
+  deadline        DateTime?        @db.Date
+  status          CorrectionStatus @default(OPEN)
+  /// Blocking corrections stop the stage from completing when its template uses the corrections.closed check.
+  blocking        Boolean          @default(true)
+  resolutionNotes String?          @map("resolution_notes")
+  resolvedAt      DateTime?        @map("resolved_at") @db.Timestamptz(3)
+  resolvedById    String?          @map("resolved_by_id") @db.Uuid
+  createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  job         Job                       @relation(fields: [jobId], references: [id], onDelete: Restrict)
+  department  Department                @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  requestedBy User?                     @relation("CorrectionRequestedBy", fields: [requestedById], references: [id], onDelete: Restrict)
+  assignedTo  User?                     @relation("CorrectionAssignedTo", fields: [assignedToId], references: [id], onDelete: Restrict)
+  history     CorrectionStatusHistory[]
+  files       CorrectionFile[]
+
+  @@index([jobId])
+  @@index([assignedToId, status])
+  @@map("correction_items")
+}
+
+model CorrectionStatusHistory {
+  id           String            @id @default(uuid(7)) @db.Uuid
+  correctionId String            @map("correction_id") @db.Uuid
+  fromStatus   CorrectionStatus? @map("from_status")
+  toStatus     CorrectionStatus  @map("to_status")
+  actorId      String?           @map("actor_id") @db.Uuid
+  reason       String?           @db.VarChar(1000)
+  createdAt    DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  correction CorrectionItem @relation(fields: [correctionId], references: [id], onDelete: Restrict)
+
+  @@index([correctionId])
+  @@map("correction_status_history")
+}
+
+model CorrectionFile {
+  correctionId String @map("correction_id") @db.Uuid
+  fileId       String @map("file_id") @db.Uuid
+  kind         String @db.VarChar(20)
+
+  correction CorrectionItem @relation(fields: [correctionId], references: [id], onDelete: Restrict)
+  file       File           @relation("CorrectionFile", fields: [fileId], references: [id], onDelete: Restrict)
+
+  @@id([correctionId, fileId])
+  @@map("correction_files")
+}
+
+model Notification {
+  id        String    @id @default(uuid(7)) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  /// Outbox event that produced it; unique with the user so retries cannot duplicate.
+  eventKey  String    @map("event_key") @db.VarChar(200)
+  type      String    @db.VarChar(50)
+  title     String    @db.VarChar(300)
+  body      String?   @db.VarChar(1000)
+  link      String?   @db.VarChar(300)
+  jobId     String?   @map("job_id") @db.Uuid
+  readAt    DateTime? @map("read_at") @db.Timestamptz(3)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  user User @relation("NotificationUser", fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, eventKey])
+  @@index([userId, readAt])
+  @@map("notifications")
+}
+
+model NotificationPreference {
+  userId  String  @map("user_id") @db.Uuid
+  type    String  @db.VarChar(50)
+  enabled Boolean @default(true)
+
+  user User @relation("NotificationPreferenceUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, type])
+  @@map("notification_preferences")
 }

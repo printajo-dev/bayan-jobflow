@@ -52,7 +52,7 @@ export interface JobDetailDto extends JobSummaryDto {
   allowedActions: JobAction[];
 }
 
-export type StageAction = 'complete' | 'completeWithException' | 'hold' | 'resume' | 'return' | 'reopen' | 'check';
+export type StageAction = 'complete' | 'completeWithException' | 'hold' | 'resume' | 'return' | 'reopen' | 'check' | 'setDeadline' | 'createTask';
 
 export interface GateResultDto {
   key: GateKey | 'checklist';
@@ -84,6 +84,8 @@ export interface StageDto {
   returnReason: string | null;
   holdReason: string | null;
   exceptionReason: string | null;
+  /** Department internal deadline (separate from the customer commitment date). */
+  internalDeadline: string | null;
   checklist: StageChecklistItemDto[];
   /** Gate evaluation; only computed for the current stage. */
   gates: GateResultDto[];

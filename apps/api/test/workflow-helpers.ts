@@ -83,11 +83,28 @@ export class Actors {
     return s;
   }
 
+  /** Design uploads a new artwork version and Sales records the customer's approval of it. */
+  async approveArtwork(jobId: string, versionLabel = 'artwork.pdf'): Promise<string> {
+    const d = await this.as('demo.design.lead');
+    const up = await d.agent.post(`${API}/jobs/${jobId}/artwork-versions`).set('X-CSRF-Token', d.csrf).field('notes', 'Proof').attach('file', PDF, versionLabel);
+    if (up.status !== 201) throw new Error(`artwork upload failed ${up.status} ${JSON.stringify(up.body)}`);
+    const versionId = up.body.versions[0].id as string;
+    const ok = await this.post('demo.sales', `/artwork-versions/${versionId}/approval-records`, {
+      approverName: 'Fleet manager',
+      approverRole: 'Customer',
+      method: 'EMAIL',
+      approvedAt: new Date().toISOString(),
+    });
+    if (ok.status !== 201) throw new Error(`approval failed ${ok.status} ${JSON.stringify(ok.body)}`);
+    return versionId;
+  }
+
   /** Ticks every checklist item of the current stage and completes it as the department leader. */
   async completeCurrent(jobId: string): Promise<WorkflowDto> {
     const wf = await this.workflow(jobId);
     const stage = this.current(wf);
     const leader = LEADER[stage.department.code]!;
+    if (stage.gates.some((g) => g.key === 'design.customer_approval' && !g.passed)) await this.approveArtwork(jobId);
     for (const item of stage.checklist.filter((c) => !c.checkedAt)) {
       const r = await this.post(leader, `/jobs/${jobId}/stages/${stage.id}/checklist/${item.id}`, { checked: true });
       if (r.status !== 200) throw new Error(`check failed ${r.status} ${JSON.stringify(r.body)}`);

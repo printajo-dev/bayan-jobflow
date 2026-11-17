@@ -4,3 +4,4 @@ export * from './types.js';
 export * from './departments.js';
 export * from './workflow.js';
 export * from './workflow-types.js';
+export * from './collaboration.js';

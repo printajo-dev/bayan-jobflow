@@ -5,6 +5,7 @@ import { createPrismaClient } from '../core/prisma.service.js';
 import { hashPassword } from '../auth/password.js';
 import { SEED_ROLES } from './seed-data.js';
 import { seedWorkflows } from './seed-workflows.js';
+import { applyUpgrades } from './seed-upgrades.js';
 
 /**
  * Reference data. Safe to run on every deploy:
@@ -44,6 +45,7 @@ export async function seedReferenceData(prisma: PrismaClient): Promise<void> {
   }
 
   await seedWorkflows(prisma);
+  await applyUpgrades(prisma, undefined, (m) => console.log(m));
 }
 
 export const DEMO_PASSWORD = 'Demo-Password-2026';

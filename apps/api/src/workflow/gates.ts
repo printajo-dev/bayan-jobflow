@@ -42,6 +42,32 @@ export class GateRegistry {
         return n > 0 ? { passed: true } : { passed: false, detail: 'Attach at least one drawing or specification' };
       },
     ],
+    [
+      'tasks.complete',
+      async ({ tx, stageId }) => {
+        const open = await tx.task.findMany({ where: { stageId, required: true, status: { notIn: ['COMPLETED', 'CANCELLED'] } }, select: { title: true } });
+        return open.length ? { passed: false, detail: `Open tasks: ${open.map((t) => t.title).join(', ')}` } : { passed: true };
+      },
+    ],
+    [
+      'corrections.closed',
+      async ({ tx, jobId, stageId }) => {
+        const stage = await tx.departmentStage.findUniqueOrThrow({ where: { id: stageId } });
+        const open = await tx.correctionItem.findMany({
+          where: { jobId, departmentId: stage.departmentId, blocking: true, status: { not: 'RESOLVED' } },
+          select: { title: true },
+        });
+        return open.length ? { passed: false, detail: `Open corrections: ${open.map((c) => c.title).join(', ')}` } : { passed: true };
+      },
+    ],
+    [
+      'design.customer_approval',
+      async ({ tx, jobId }) => {
+        const latest = await tx.artworkVersion.findFirst({ where: { jobId }, orderBy: { versionNo: 'desc' }, include: { _count: { select: { approvals: true } } } });
+        if (!latest) return { passed: false, detail: 'No artwork version uploaded yet' };
+        return latest._count.approvals > 0 ? { passed: true } : { passed: false, detail: `Artwork version ${latest.versionNo} has no recorded customer approval` };
+      },
+    ],
   ]);
 
   async evaluate(gateKeys: string[], ctx: GateContext): Promise<GateResultDto[]> {

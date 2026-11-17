@@ -72,6 +72,8 @@ export function stageActions(p: Principal, s: StageAccessFacts): StageAction[] {
     if (s.hasReturnTargets && p.hasInDepartment('stage.return', d)) actions.push('return');
   }
   if (s.status === 'ON_HOLD' && p.hasInDepartment('stage.hold', d)) actions.push('resume');
+  if (['PENDING', 'ACTIVE', 'ON_HOLD'].includes(s.status) && s.jobStatus === 'OPEN' && p.hasInDepartment('task.set_deadline', d)) actions.push('setDeadline');
+  if (['ACTIVE', 'ON_HOLD'].includes(s.status) && s.jobStatus === 'OPEN' && p.hasInDepartment('task.create', d)) actions.push('createTask');
   if (s.status === 'COMPLETED' && s.isLatestOccurrence && p.hasGlobal('stage.reopen')) actions.push('reopen');
   return actions;
 }

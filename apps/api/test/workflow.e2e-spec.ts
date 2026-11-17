@@ -33,7 +33,7 @@ describe('Jobs and workflow engine (Phase 2 acceptance)', () => {
       expect(res.body.jobNumber).toBe(number);
       expect(res.body.brief).not.toHaveProperty('customer');
       expect(res.body.briefProblems).toEqual([]);
-      expect(res.body.templateVersion).toMatchObject({ templateName: 'Vehicle Branding', versionNo: 1 });
+      expect(res.body.templateVersion.templateName).toBe('Vehicle Branding');
 
       // Same number in a different case is a duplicate.
       const dup = await as.post('demo.sales', '/jobs', { jobNumber: number.toLowerCase(), serviceType: 'SG', title: 'Dup', brief: {} });
@@ -113,11 +113,13 @@ describe('Jobs and workflow engine (Phase 2 acceptance)', () => {
 
     it('department employees can tick the checklist but only leaders complete the stage', async () => {
       const job = await as.createJob('VB', COMPLETE_VB_BRIEF);
+      await as.completeCurrent(job.id);
       const wf = await as.completeCurrent(job.id);
-      const design = as.current(wf);
-      const tick = await as.post('demo.design', `/jobs/${job.id}/stages/${design.id}/checklist/${design.checklist[0]!.id}`, { checked: true });
+      const gov = as.current(wf);
+      expect(gov.key).toBe('government_approval');
+      const tick = await as.post('demo.pro', `/jobs/${job.id}/stages/${gov.id}/checklist/${gov.checklist[0]!.id}`, { checked: true });
       expect(tick.status).toBe(200);
-      const done = await as.post('demo.design', `/jobs/${job.id}/stages/${design.id}/complete`);
+      const done = await as.post('demo.pro', `/jobs/${job.id}/stages/${gov.id}/complete`);
       expect(done.status).toBe(403);
     });
 
@@ -135,7 +137,7 @@ describe('Jobs and workflow engine (Phase 2 acceptance)', () => {
       const design = as.current(next);
       const blocked = await as.post('demo.design.lead', `/jobs/${job.id}/stages/${design.id}/complete`);
       expect(blocked.status).toBe(422);
-      expect(blocked.body.message.join(' ')).toMatch(/Customer approval recorded/);
+      expect(blocked.body.message.join(' ')).toMatch(/Customer approval recorded|No artwork version/);
     });
   });
 
@@ -277,7 +279,7 @@ describe('Jobs and workflow engine (Phase 2 acceptance)', () => {
       await admin.agent.post(`${API}/workflow-template-versions/${draft.body.id}/publish`).set('X-CSRF-Token', admin.csrf).expect(200);
       expect((await as.workflow(oldJob.id)).stages).toHaveLength(5);
       const newJob = await as.createJob('SG', COMPLETE_SG_BRIEF);
-      expect(newJob.templateVersion.versionNo).toBe(2);
+      expect(newJob.templateVersion.versionNo).toBe(draft.body.versionNo);
       expect(keys(await as.workflow(newJob.id))).toContain('site_survey_signoff');
 
       const v1Now = await admin.agent.get(`${API}/workflow-template-versions/${v1.id}`);

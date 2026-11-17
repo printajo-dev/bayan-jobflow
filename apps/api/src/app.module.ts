@@ -25,6 +25,13 @@ import { SettingsController, SettingsService } from './settings/settings.js';
 import { JobsService } from './jobs/jobs.service.js';
 import { FilesController, JobsController } from './jobs/jobs.controller.js';
 import { FilesService } from './files/files.service.js';
+import { RealtimeService } from './realtime/realtime.service.js';
+import { DiscussionsService } from './discussions/discussions.service.js';
+import { TasksService } from './tasks/tasks.service.js';
+import { DesignService } from './design/design.service.js';
+import { CorrectionsService } from './corrections/corrections.service.js';
+import { NotificationsController, NotificationsService } from './notifications/notifications.js';
+import { CorrectionsController, DesignController, DiscussionsController, TasksController } from './collaboration.controllers.js';
 
 /**
  * Phase 1 wires every module into one Nest module; the services keep their
@@ -45,6 +52,11 @@ import { FilesService } from './files/files.service.js';
     SettingsController,
     JobsController,
     FilesController,
+    TasksController,
+    DesignController,
+    DiscussionsController,
+    CorrectionsController,
+    NotificationsController,
   ],
   providers: [
     AuditService,
@@ -61,6 +73,12 @@ import { FilesService } from './files/files.service.js';
     SettingsService,
     JobsService,
     FilesService,
+    RealtimeService,
+    DiscussionsService,
+    TasksService,
+    DesignService,
+    CorrectionsService,
+    NotificationsService,
     { provide: APP_GUARD, useClass: AuthGuard },
     { provide: APP_FILTER, useClass: HttpExceptionFilter },
   ],

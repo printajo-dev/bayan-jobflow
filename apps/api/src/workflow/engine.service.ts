@@ -13,6 +13,7 @@ import type { ActionMeta } from '../access/decorators.js';
 import type { Principal } from '../access/principal.js';
 import { canViewJob, stageActions, type JobAccessFacts } from '../jobs/job-access.js';
 import { GateRegistry } from './gates.js';
+import { postSystemMessage } from '../discussions/channels.js';
 
 interface TemplateStageRow {
   id: string;
@@ -37,6 +38,7 @@ interface StageRow {
   returnReason: string | null;
   holdReason: string | null;
   exceptionReason: string | null;
+  internalDeadline: Date | null;
   completedBy: { fullName: string } | null;
   checklist: { id: string; sequence: number; label: string; required: boolean; checkedAt: Date | null; checkedBy: { fullName: string } | null }[];
 }
@@ -138,6 +140,7 @@ export class WorkflowEngine {
           : `${ts.name} completed${stage.occurrenceNo > 1 ? ` (round ${stage.occurrenceNo})` : ''}`,
         after: exceptionReason ? { unmetChecks: failed.map((f) => f.label) } : undefined,
       });
+      await postSystemMessage(tx, ctx.job.id, ts.departmentId, `${ts.name} completed${exceptionReason ? ` by exception: ${exceptionReason}` : ''}.`, stage.id);
       await this.outbox.enqueue(tx, {
         type: 'workflow.stage.completed',
         aggregateType: 'job',
@@ -154,6 +157,7 @@ export class WorkflowEngine {
       await tx.departmentStage.update({ where: { id: stage.id }, data: { status: 'ON_HOLD', holdReason: reason } });
       await this.transition(tx, ctx.workflow.id, stage.id, 'hold', 'ACTIVE', 'ON_HOLD', meta.actorId, reason);
       await this.audit.record(tx, meta, { action: 'workflow.stage_held', entityType: 'job', entityId: ctx.job.id, summary: `${ts.name} put on hold: ${reason}` });
+      await postSystemMessage(tx, ctx.job.id, ts.departmentId, `${ts.name} put on hold: ${reason}`, stage.id);
     });
   }
 
@@ -182,6 +186,7 @@ export class WorkflowEngine {
         summary: `${ts.name} returned the job to ${target.name} (round ${occ}): ${reason}`,
       });
       await this.activated(tx, ctx, newId, target, 'workflow.stage.returned', { fromStageId: stage.id, reason });
+      await postSystemMessage(tx, ctx.job.id, target.departmentId, `${ts.name} returned the job for correction (round ${occ}): ${reason}`, newId);
     });
   }
 
@@ -213,6 +218,7 @@ export class WorkflowEngine {
         summary: `${ts.name} reopened (round ${occ}): ${reason}`,
       });
       await this.activated(tx, ctx, newId, ts, 'workflow.stage.reopened', { reason });
+      await postSystemMessage(tx, ctx.job.id, ts.departmentId, `${ts.name} reopened by an administrator (round ${occ}): ${reason}`, newId);
     });
   }
 
@@ -318,6 +324,7 @@ export class WorkflowEngine {
     }
     await this.transition(tx, ctx.workflow.id, id, 'activate', 'PENDING', 'ACTIVE', meta.actorId, null);
     await this.activated(tx, ctx, id, next, 'workflow.stage.activated', {});
+    await postSystemMessage(tx, ctx.job.id, next.departmentId, `${next.name} has started for your department.`, id);
   }
 
   private async activated(tx: Tx, ctx: WorkflowContext, stageId: string, ts: TemplateStageRow, type: string, extra: Record<string, unknown>) {
@@ -481,6 +488,7 @@ export class WorkflowEngine {
         returnReason: s.returnReason,
         holdReason: s.holdReason,
         exceptionReason: s.exceptionReason,
+        internalDeadline: s.internalDeadline ? s.internalDeadline.toISOString().slice(0, 10) : null,
         checklist: s.checklist.map((c) => ({
           id: c.id,
           label: c.label,

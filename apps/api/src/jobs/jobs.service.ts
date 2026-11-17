@@ -26,6 +26,7 @@ import type { Principal } from '../access/principal.js';
 import { SettingsService } from '../settings/settings.js';
 import { WorkflowEngine } from '../workflow/engine.service.js';
 import { briefProblems, briefToInput } from '../workflow/gates.js';
+import { ensureChannels } from '../discussions/channels.js';
 import { canViewJob, jobActions, visibleJobsWhere, type JobAccessFacts } from './job-access.js';
 import type { Prisma } from '../generated/prisma/client.js';
 
@@ -205,6 +206,8 @@ export class JobsService {
         },
       });
       await this.engine.instantiate(tx, job.id, version.id, meta);
+      const stageDepartments = await tx.workflowTemplateStage.findMany({ where: { versionId: version.id }, select: { departmentId: true } });
+      await ensureChannels(tx, job.id, stageDepartments.map((s) => s.departmentId));
       await this.audit.record(tx, meta, {
         action: 'job.created',
         entityType: 'job',

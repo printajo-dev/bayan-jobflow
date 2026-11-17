@@ -10,9 +10,9 @@ import { z } from 'zod';
 export const GATES = [
   { key: 'brief.complete', label: 'Job brief has all required fields', available: true },
   { key: 'brief.attachments', label: 'At least one drawing or specification file is attached to the brief', available: true },
-  { key: 'tasks.complete', label: 'All required tasks are completed', available: false, phase: 3 },
-  { key: 'corrections.closed', label: 'No open blocking corrections', available: false, phase: 3 },
-  { key: 'design.customer_approval', label: 'Customer approval recorded for the latest artwork version', available: false, phase: 3 },
+  { key: 'tasks.complete', label: 'All required tasks are completed', available: true },
+  { key: 'corrections.closed', label: 'No open blocking corrections', available: true },
+  { key: 'design.customer_approval', label: 'Customer approval recorded for the latest artwork version', available: true },
   { key: 'authority.all_cleared', label: 'Every required authority approval is Approved or Not Required', available: false, phase: 4 },
   { key: 'logistics.schedule_confirmed', label: 'Vehicle schedule confirmed', available: false, phase: 4 },
   { key: 'production.completed', label: 'All production orders completed', available: false, phase: 4 },
