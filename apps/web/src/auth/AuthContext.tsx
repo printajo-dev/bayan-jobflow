@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, type ReactN
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ChangePasswordInput, CurrentUserDto, LoginInput, PermissionKey } from '@jobflow/shared';
 import { ApiError, get, post, setCsrfToken, setUnauthorizedHandler } from '../api/client';
+import { disconnectRealtime } from '../realtime';
 
 interface AuthState {
   me: CurrentUserDto | null;
@@ -29,7 +30,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const { data, isPending } = useQuery({ queryKey: ME_KEY, queryFn: fetchMe, staleTime: 60_000, retry: false });
   const me = data ?? null;
 
-  useEffect(() => setCsrfToken(me?.csrfToken ?? null), [me]);
+  useEffect(() => {
+    setCsrfToken(me?.csrfToken ?? null);
+  }, [me]);
 
   const setMe = useCallback(
     (value: CurrentUserDto | null) => {
@@ -41,6 +44,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   /** Signed out (or session expired): drop cached data but keep the auth query alive. */
   const signedOut = useCallback(() => {
+    disconnectRealtime();
     qc.removeQueries({ predicate: (q) => q.queryKey[0] !== ME_KEY[0] });
     setMe(null);
   }, [qc, setMe]);

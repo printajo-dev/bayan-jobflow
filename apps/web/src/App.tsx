@@ -18,6 +18,8 @@ import { SettingsPage } from './pages/admin/SettingsPage';
 import { JobsPage } from './pages/jobs/JobsPage';
 import { NewJobPage } from './pages/jobs/NewJobPage';
 import { JobPage } from './pages/jobs/JobPage';
+import { MyWorkPage } from './pages/MyWorkPage';
+import { NotificationsPage } from './pages/NotificationsPage';
 
 const PASSWORD_PATH = '/account/password';
 
@@ -46,6 +48,8 @@ export const routes = [
         children: [
           { index: true, element: <HomePage /> },
           { path: PASSWORD_PATH, element: <ChangePasswordPage /> },
+          { path: '/my-work', element: <MyWorkPage /> },
+          { path: '/notifications', element: <NotificationsPage /> },
           {
             element: <RequirePermission permission="job.view" />,
             children: [

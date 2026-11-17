@@ -3,9 +3,9 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Alert, Badge, Button, Card, Checkbox, Group, List, Modal, Select, Stack, Text, Textarea, ThemeIcon, Timeline } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import type { StageDto, WorkflowDto } from '@jobflow/shared';
-import { post } from '../api/client';
+import { post, put } from '../api/client';
 import { errorMessage } from './states';
-import { formatDateTime, STAGE_STATUS } from './format';
+import { formatDate, formatDateTime, STAGE_STATUS } from './format';
 
 type ReasonAction = 'hold' | 'return' | 'reopen' | 'completeWithException';
 
@@ -95,6 +95,14 @@ export function WorkflowTimeline({ jobId, workflow }: { jobId: string; workflow:
                     onComplete={() => complete.mutate(s)}
                     onResume={() => resume.mutate(s)}
                     onReason={(action) => setDialog({ action, stage: s })}
+                    onDeadline={() => {
+                      const value = window.prompt(`Internal deadline for ${s.name} (YYYY-MM-DD, empty to clear). The customer date is not changed.`, s.internalDeadline ?? '');
+                      if (value === null) return;
+                      if (value && !/^\d{4}-\d{2}-\d{2}$/.test(value)) return onError(new Error('Use the format YYYY-MM-DD'));
+                      void put(`/jobs/${jobId}/stages/${s.id}/deadline`, { internalDeadline: value || null })
+                        .then(() => qc.invalidateQueries({ queryKey: ['jobs', jobId] }))
+                        .catch(onError);
+                    }}
                   />
                 ))}
               </Stack>
@@ -115,6 +123,7 @@ function StageBlock({
   onComplete,
   onResume,
   onReason,
+  onDeadline,
 }: {
   stage: StageDto;
   showRound: boolean;
@@ -123,6 +132,7 @@ function StageBlock({
   onComplete: () => void;
   onResume: () => void;
   onReason: (a: ReasonAction) => void;
+  onDeadline: () => void;
 }) {
   const current = s.status === 'ACTIVE' || s.status === 'ON_HOLD';
   const can = (a: StageDto['allowedActions'][number]) => s.allowedActions.includes(a);
@@ -166,6 +176,16 @@ function StageBlock({
     <Card withBorder padding="sm" radius="md" bg={s.status === 'ON_HOLD' ? 'orange.0' : 'blue.0'}>
       <Stack gap="xs">
         {meta}
+        <Group gap="xs">
+          <Text size="xs">
+            Internal deadline: <b>{s.internalDeadline ? formatDate(s.internalDeadline) : 'not set'}</b>
+          </Text>
+          {can('setDeadline') && (
+            <Button size="compact-xs" variant="subtle" onClick={() => onDeadline()}>
+              {s.internalDeadline ? 'Change' : 'Set'}
+            </Button>
+          )}
+        </Group>
         {s.returnedFrom && (
           <Alert color="red" p="xs" title={`Returned by ${s.returnedFrom.name}`}>
             {s.returnReason}

@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Link, useParams } from 'react-router';
+import { Link, useParams, useSearchParams } from 'react-router';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Alert,
@@ -34,6 +34,11 @@ import {
 import { API_BASE, del, get, patch, post, toQuery, upload } from '../../api/client';
 import { BriefForm, briefFromDto, briefToPayload } from '../../components/BriefForm';
 import { WorkflowTimeline } from '../../components/WorkflowTimeline';
+import { useAuth } from '../../auth/AuthContext';
+import { TasksPanel } from './TasksPanel';
+import { DesignPanel } from './DesignPanel';
+import { DiscussionsPanel } from './DiscussionsPanel';
+import { CorrectionsPanel } from './CorrectionsPanel';
 import { EmptyState, ErrorState, errorMessage, LoadingState } from '../../components/states';
 import { COVERAGE, formatDate, formatDateTime, formatSize, JOB_STATUS, PRIORITY } from '../../components/format';
 
@@ -41,6 +46,8 @@ export function JobPage() {
   const { id = '' } = useParams();
   const job = useQuery({ queryKey: ['jobs', id], queryFn: () => get<JobDetailDto>(`/jobs/${id}`) });
   const [dialog, setDialog] = useState<'edit' | 'number' | 'cancel' | null>(null);
+  const [params, setParams] = useSearchParams();
+  const { can: canDo } = useAuth();
 
   if (job.isPending) return <LoadingState />;
   if (job.isError) return <ErrorState error={job.error} />;
@@ -99,13 +106,29 @@ export function JobPage() {
         </Group>
       </Group>
 
-      <Tabs defaultValue="workflow" keepMounted={false}>
+      <Tabs value={params.get('tab') ?? 'workflow'} onChange={(v) => setParams(v ? { tab: v } : {}, { replace: true })} keepMounted={false}>
         <Tabs.List>
           <Tabs.Tab value="workflow">Workflow</Tabs.Tab>
           <Tabs.Tab value="overview">Brief</Tabs.Tab>
+          {canDo('task.view') && <Tabs.Tab value="tasks">Tasks</Tabs.Tab>}
+          {(canDo('artwork.view') || canDo('customer_approval.record')) && <Tabs.Tab value="design">Design & approvals</Tabs.Tab>}
+          {canDo('channel.view') && <Tabs.Tab value="discussions">Discussions</Tabs.Tab>}
+          <Tabs.Tab value="corrections">Corrections</Tabs.Tab>
           <Tabs.Tab value="files">Files ({j.files.length})</Tabs.Tab>
           <Tabs.Tab value="activity">Activity</Tabs.Tab>
         </Tabs.List>
+        <Tabs.Panel value="tasks" pt="md">
+          <TasksPanel jobId={j.id} />
+        </Tabs.Panel>
+        <Tabs.Panel value="design" pt="md">
+          <DesignPanel jobId={j.id} />
+        </Tabs.Panel>
+        <Tabs.Panel value="discussions" pt="md">
+          <DiscussionsPanel jobId={j.id} />
+        </Tabs.Panel>
+        <Tabs.Panel value="corrections" pt="md">
+          <CorrectionsPanel jobId={j.id} />
+        </Tabs.Panel>
         <Tabs.Panel value="workflow" pt="md">
           <WorkflowPanel jobId={j.id} />
         </Tabs.Panel>

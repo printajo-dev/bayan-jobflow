@@ -26,6 +26,7 @@ import { JobsService } from './jobs/jobs.service.js';
 import { FilesController, JobsController } from './jobs/jobs.controller.js';
 import { FilesService } from './files/files.service.js';
 import { RealtimeService } from './realtime/realtime.service.js';
+import { DirectoryController } from './directory.controller.js';
 import { DiscussionsService } from './discussions/discussions.service.js';
 import { TasksService } from './tasks/tasks.service.js';
 import { DesignService } from './design/design.service.js';
@@ -57,6 +58,7 @@ import { CorrectionsController, DesignController, DiscussionsController, TasksCo
     DiscussionsController,
     CorrectionsController,
     NotificationsController,
+    DirectoryController,
   ],
   providers: [
     AuditService,

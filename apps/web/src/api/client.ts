@@ -79,6 +79,38 @@ export async function upload<T>(path: string, file: File): Promise<T> {
   return data as T;
 }
 
+/** Upload with progress reporting (XMLHttpRequest, because fetch cannot report upload progress). */
+export function uploadWithProgress<T>(path: string, file: Blob, filename: string, onProgress?: (fraction: number) => void, fields: Record<string, string> = {}): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `${API_BASE}${path}`);
+    xhr.withCredentials = true;
+    xhr.setRequestHeader('Accept', 'application/json');
+    if (csrfToken) xhr.setRequestHeader('X-CSRF-Token', csrfToken);
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) onProgress?.(e.loaded / e.total);
+    };
+    xhr.onerror = () => reject(new ApiError(0, 'Cannot reach the JobFlow server. Check the network connection.'));
+    xhr.onload = () => {
+      let data: unknown;
+      try {
+        data = JSON.parse(xhr.responseText);
+      } catch {
+        data = undefined;
+      }
+      if (xhr.status >= 200 && xhr.status < 300) return resolve(data as T);
+      if (xhr.status === 401) onUnauthorized?.();
+      const err = data as ApiErrorBody | undefined;
+      reject(new ApiError(xhr.status, xhr.status === 413 ? 'The file is too large.' : messageOf(err, xhr.status), err));
+    };
+    const form = new FormData();
+    // Text fields first so the server sees them before the file stream.
+    for (const [k, v] of Object.entries(fields)) form.append(k, v);
+    form.append('file', file, filename);
+    xhr.send(form);
+  });
+}
+
 export const del = <T>(path: string) => api<T>('DELETE', path);
 export const get = <T>(path: string) => api<T>('GET', path);
 export const post = <T>(path: string, body?: unknown) => api<T>('POST', path, body ?? {});

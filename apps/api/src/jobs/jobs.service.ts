@@ -123,7 +123,9 @@ export class JobsService {
           },
         },
         files: {
-          where: { removedAt: null, file: { deletedAt: null } },
+          // The Files tab shows brief attachments only; artwork, approval
+          // evidence and discussion attachments have their own access rules.
+          where: { removedAt: null, purpose: 'BRIEF', file: { deletedAt: null } },
           include: { file: { include: { uploadedBy: { select: { fullName: true } } } } },
           orderBy: { createdAt: 'asc' },
         },

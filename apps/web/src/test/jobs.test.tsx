@@ -40,6 +40,7 @@ function stage(partial: Partial<StageDto>): StageDto {
     returnReason: null,
     holdReason: null,
     exceptionReason: null,
+    internalDeadline: null,
     checklist: [],
     gates: [],
     allowedActions: [],

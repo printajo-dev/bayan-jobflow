@@ -3,6 +3,7 @@ import { AppShell, Badge, Burger, Group, Menu, NavLink, Stack, Text, Title, Unst
 import { useDisclosure } from '@mantine/hooks';
 import type { PermissionKey } from '@jobflow/shared';
 import { useAuth } from '../auth/AuthContext';
+import { NotificationBell } from './NotificationBell';
 
 interface NavItem {
   to: string;
@@ -13,6 +14,8 @@ interface NavItem {
 const MAIN: NavItem[] = [
   { to: '/', label: 'Home' },
   { to: '/jobs', label: 'Jobs', permission: 'job.view' },
+  { to: '/my-work', label: 'My work', permission: 'task.view' },
+  { to: '/notifications', label: 'Notifications' },
 ];
 
 export const ADMIN_NAV: NavItem[] = [
@@ -50,6 +53,8 @@ export function Layout() {
             <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" aria-label="Toggle navigation" />
             <Title order={4}>Bayan JobFlow</Title>
           </Group>
+          <Group gap="sm">
+          {!forced && <NotificationBell />}
           <Menu position="bottom-end" withinPortal>
             <Menu.Target>
               <UnstyledButton aria-label="Account menu">
@@ -70,6 +75,7 @@ export function Layout() {
               </Menu.Item>
             </Menu.Dropdown>
           </Menu>
+          </Group>
         </Group>
       </AppShell.Header>
 

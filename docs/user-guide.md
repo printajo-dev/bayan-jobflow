@@ -1,4 +1,4 @@
-# User guide — jobs and workflow (Phase 2)
+# User guide
 
 Open JobFlow at `https://<server address>` and sign in with your office account.
 What you see depends on your department and role.
@@ -87,9 +87,53 @@ it. Earlier rounds, ticks and reasons stay visible in the timeline.
   history is kept.
 - **Activity** lists everything that happened to the job, newest first.
 
+## Tasks (Tasks tab, *My work*)
+
+- Leaders press *Add task* on a stage of their department, choose employees
+  of the department, a due date (the employee deadline), dependencies and an
+  optional checklist. *Required* tasks must be finished before the stage can be
+  completed.
+- Leaders also set the stage's **internal deadline** on the Workflow tab. It is
+  separate from the customer date, which only Sales changes.
+- Employees see their tasks under *My work* and move them through To do →
+  In progress → Completed. Leaders can cancel or reopen a task with a reason.
+
+## Design & approvals
+
+- Designers upload artwork with *Upload new version*. Every upload is a new
+  version; nothing is ever overwritten.
+- Sales records the customer's approval with *Record customer approval*: who
+  approved, how (email, WhatsApp, phone, in person, signed form), when, notes and
+  evidence. Approval belongs to that exact version: after a new upload, a new
+  approval is needed before Design can be completed.
+- *New correction round* records what the customer wants changed; the next
+  upload can be marked as resolving that round.
+
+## Discussions
+
+Each job has a channel per department plus *General*. You see your
+department's channel and General; leaders can add a person from another
+department to one channel. Write messages, reply in threads, attach files,
+record a **voice note** (🎤, up to 10 minutes; your browser asks for the
+microphone the first time), mention colleagues, react, and search. Edited and
+deleted messages keep their history. *Make correction* turns a message into a
+formal correction.
+
+## Corrections
+
+A correction is a tracked request to fix something, assigned to a department
+and usually a person. It moves Open → Assigned → In progress → Resolved (with
+notes and evidence) and can be reopened. A *blocking* correction stops the
+department's stage until it is resolved.
+
+## Notifications
+
+The bell shows unread notifications (assignments, mentions, replies, stages
+starting or returned, approvals, corrections, due and overdue tasks). Choose
+what you want to be told about at the bottom of the Notifications page.
+
 ## Interim checklists (until later phases)
 
-Until the artwork, PRO, scheduling, production, QC and delivery screens are
-released, those stages are completed by ticking their checklist items (for
-example *"Customer approval recorded against the exact artwork version"*).
+Until the PRO, scheduling, production, installation, QC and delivery screens
+are released, those stages are completed by ticking their checklist items.
 Each later phase replaces these ticks with the real records and checks.

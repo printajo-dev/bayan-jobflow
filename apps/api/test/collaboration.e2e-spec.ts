@@ -235,6 +235,8 @@ describe('Phase 3: tasks, design approval, discussions, corrections, notificatio
       expect((await as.get('demo.design', `/files/${voice.body.id}/download?inline=1`)).headers['content-type']).toMatch(/audio\/webm/);
       expect((await as.get('demo.pro.lead', `/files/${voice.body.id}/download`)).status).toBe(404);
       expect((await as.get('demo.sales', `/files/${voice.body.id}/download`)).status).toBe(404);
+      // Discussion attachments never appear in the job's Files list.
+      expect((await as.get('demo.sales', `/jobs/${job.id}`)).body.files).toEqual([]);
     });
 
     it('rejects voice notes longer than ten minutes', async () => {

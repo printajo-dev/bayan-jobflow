@@ -1,6 +1,7 @@
 import type { GateKey, PermissionKey } from '@jobflow/shared';
 import type { PrismaClient } from '../generated/prisma/client.js';
 import type { Prisma } from '../generated/prisma/client.js';
+import { ensureChannels } from '../discussions/channels.js';
 
 export interface StageDef {
   key: string;
@@ -18,6 +19,7 @@ export interface TemplateDef {
 
 type Upgrade =
   | { id: string; kind: 'grants'; role: string; add: PermissionKey[] }
+  | { id: string; kind: 'run'; description: string; run: (prisma: PrismaClient) => Promise<void> }
   | { id: string; kind: 'template'; template: string; fromVersionNo: number; notes: string; transform: (def: TemplateDef, depts: Map<string, string>) => TemplateDef };
 
 const addGates = (s: StageDef, gates: GateKey[]) => ({ ...s, gateKeys: [...new Set([...s.gateKeys, ...gates])] });
@@ -70,6 +72,20 @@ export const UPGRADES: Upgrade[] = [
   },
 ];
 
+/** Jobs created before discussions existed get their department channels. */
+async function backfillChannels(prisma: PrismaClient): Promise<void> {
+  const jobs = await prisma.job.findMany({
+    where: { channels: { none: {} } },
+    select: { id: true, workflow: { select: { templateVersion: { select: { stages: { select: { departmentId: true } } } } } } },
+  });
+  for (const j of jobs) {
+    const depts = j.workflow?.templateVersion.stages.map((s) => s.departmentId) ?? [];
+    await prisma.$transaction((tx) => ensureChannels(tx, j.id, depts));
+  }
+}
+
+UPGRADES.push({ id: '2026-11-p3-backfill-channels', kind: 'run', description: 'create discussion channels for existing jobs', run: backfillChannels });
+
 const KEY = 'seed.upgrades';
 
 export async function applyUpgrades(prisma: PrismaClient, upgrades: Upgrade[] = UPGRADES, log: (m: string) => void = () => {}): Promise<void> {
@@ -81,6 +97,12 @@ export async function applyUpgrades(prisma: PrismaClient, upgrades: Upgrade[] = 
 
   for (const u of upgrades) {
     if (applied.has(u.id) || skipped.has(u.id)) continue;
+    if (u.kind === 'run') {
+      await u.run(prisma);
+      applied.add(u.id);
+      log(`Upgrade ${u.id}: ${u.description}`);
+      continue;
+    }
     if (u.kind === 'grants') {
       const role = await prisma.role.findUnique({ where: { key: u.role } });
       if (role) {

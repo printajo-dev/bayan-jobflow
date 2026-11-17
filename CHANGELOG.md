@@ -1,5 +1,40 @@
 # Changelog
 
+## Phase 3 — Tasks, design approvals, discussions, corrections, notifications (unreleased)
+
+Built
+- Tasks per stage occurrence: leaders create and assign department members
+  manually; dependencies, checklists, comments, priorities; employee task
+  deadline, department internal deadline (per stage) and customer date kept
+  separate; required tasks block stage completion (`tasks.complete`).
+- Design: immutable artwork versions (SHA-256, never overwritten, DB-protected),
+  correction rounds with designer, deadline and markup files; Sales records
+  customer approval manually against the exact latest version with method,
+  approver, time, notes and evidence; a new version needs a new approval
+  (`design.customer_approval`). PRO and other departments cannot see design work.
+- Department discussion channels per job (+ General), created automatically;
+  administrators can open extra channels; leaders add cross-department
+  participants to one channel only. Threads, multiple attachments, browser voice
+  notes (record/pause/resume/stop/preview/re-record, WebM/Opus, server-side
+  type/size/duration checks, max 10 min), mentions limited to people who can
+  read the channel, reactions, pins, read receipts and unread counts, full-text
+  search, system messages for stage changes, approvals and corrections. Edits and
+  deletes are kept in an append-only history; messages are never hard-deleted.
+- Formal corrections (from a message or directly): department, stage, assignee,
+  priority, deadline, blocking flag, attachments, resolution notes and evidence,
+  reopen, status history (append-only); blocking corrections stop the stage
+  (`corrections.closed`).
+- In-app notifications produced by the worker from outbox events (idempotent per
+  user and event), per-type preferences, due-soon/overdue task reminders,
+  notification bell and page, “My work” page.
+- Live updates with Socket.IO (session-cookie auth, room authorisation, Redis
+  adapter/emitter); the app keeps working through REST if Redis or the socket is
+  down.
+- Seed upgrades: new template versions add the Phase 3 checks (skipped when an
+  administrator already changed the template), administrator grants, and
+  channels for existing jobs.
+
+
 ## Phase 2 — Jobs and workflow engine (unreleased)
 
 Built
