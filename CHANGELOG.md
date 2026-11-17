@@ -1,5 +1,36 @@
 # Changelog
 
+## Phase 4 — PRO approvals, vehicle schedule, production, installation (unreleased)
+
+Built
+- PRO / government approvals per job (RTA, Dubai Municipality, Trakhees, Civil
+  Defence; administrators can add authorities): status flow Pending preparation →
+  Ready → Submitted → Under review → Approved / Rejected / More information required
+  → resubmission, Expired; reference numbers, dates, validity, fees, payments with
+  receipts, documents (application, approval, rejection, receipt), every submission
+  and decision kept; append-only status history. Approved requires an approval
+  document. Not Required only by the PRO Leader or an administrator, with a reason,
+  audited. Design and other departments cannot read or change authority records.
+- Government Approval stage check (`authority.all_cleared`): Print and Wrap cannot
+  start while any required approval is pending, rejected or expired.
+- Vehicle schedules (Logistic): proposed → confirmed only with a recorded
+  confirmation of vehicle availability; rescheduling a confirmed schedule needs a
+  reason and re-confirmation; full history; Design, Production and Installation
+  leaders are notified (`logistics.schedule_confirmed`).
+- Production orders for Print (Vehicle Branding) and Production (Signage):
+  activity, approved artwork version (VB prints only the latest customer-approved
+  version), material, quantity, dimensions, machine/printer, operator, planned and
+  actual times, wastage, progress logs with evidence; completion needs evidence
+  (`production.completed`). Machines are managed in Settings.
+- Installation orders for Wrap and Signage installation: vehicle/site, address,
+  access and safety notes, instructions, schedule, team leader, technicians,
+  materials, blocked/partial states with issues, progress logs and completion
+  photos (`installation.completed`).
+- Web: PRO approvals tab, Operations tab (schedule, production, installation),
+  authority types and machines in Settings.
+- Template upgrades publish the Phase 4 checks.
+
+
 ## Phase 3 — Tasks, design approvals, discussions, corrections, notifications (unreleased)
 
 Built

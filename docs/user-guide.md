@@ -132,8 +132,37 @@ The bell shows unread notifications (assignments, mentions, replies, stages
 starting or returned, approvals, corrections, due and overdue tasks). Choose
 what you want to be told about at the bottom of the Notifications page.
 
+## PRO approvals (Vehicle Branding)
+
+The **PRO approvals** tab lists the authority applications for the job.
+PRO adds each required authority (e.g. RTA), records the submission
+(reference number, date, fees), the authority's decision, payments and
+documents. An application is only *Approved* after the approval document is
+attached. A rejection keeps the earlier submission; resubmit after Design has
+made the change (use *Return for correction* on the Government Approval stage
+to send the job back to Design). If an authority is not needed for this job,
+the PRO Leader (or an administrator) uses *Mark Not Required* with a reason.
+Print and Wrap cannot start until every application is Approved or Not
+Required.
+
+## Operations
+
+- **Vehicle schedule** (Logistic, Vehicle Branding only): propose date, time,
+  vehicle and place; press *Confirm availability* only after the customer has
+  confirmed the vehicle, and note who confirmed. Changing a confirmed schedule
+  needs a reason and a new confirmation; Design, Production and Installation
+  leaders are told automatically.
+- **Production**: plan production orders (activity, material, quantity, machine,
+  operator, times). Add progress logs with photos; an order can only be
+  completed after a log with evidence. Vehicle Branding always prints the
+  latest customer-approved artwork.
+- **Installation**: plan the installation (vehicle or site, address, access and
+  safety notes, team leader, technicians, materials). Technicians add progress
+  logs; completion needs a log with photos. Use *Blocked* or *Partial* with a
+  description when work cannot finish.
+
 ## Interim checklists (until later phases)
 
-Until the PRO, scheduling, production, installation, QC and delivery screens
-are released, those stages are completed by ticking their checklist items.
+Until the QC and delivery screens are released, those stages are completed by
+ticking their checklist items.
 Each later phase replaces these ticks with the real records and checks.
