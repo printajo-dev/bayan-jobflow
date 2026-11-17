@@ -32,7 +32,10 @@ for deb in debs/*.deb; do
   if [[ -z "$have" ]] || dpkg --compare-versions "$have" lt "$ver"; then cp "$deb" "$pick/"; fi
 done
 if compgen -G "$pick/*.deb" >/dev/null; then
-  apt-get install -y --no-download --no-install-recommends "$pick"/*.deb
+  # dpkg installs the whole set in one go and orders it itself (apt refuses to
+  # upgrade essential packages such as perl-base from local files).
+  DEBIAN_FRONTEND=noninteractive dpkg -i --force-confold "$pick"/*.deb >/dev/null || DEBIAN_FRONTEND=noninteractive dpkg --configure -a
+  [[ -z "$(dpkg --audit)" ]] || { dpkg --audit; die "Some packages are not fully installed"; }
 else
   log "All packages already installed"
 fi
