@@ -1,0 +1,10 @@
+[Unit]
+Description=Bayan JobFlow backup (%i)
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/srv/bayan-jobflow/deploy/scripts/backup.sh %i
+Nice=10
+IOSchedulingClass=idle

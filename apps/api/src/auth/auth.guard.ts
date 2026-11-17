@@ -3,12 +3,14 @@ import {
   type ExecutionContext,
   ForbiddenException,
   Injectable,
+  ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
 import type { PermissionKey } from '@jobflow/shared';
 import {
+  ALLOW_DURING_MAINTENANCE,
   ALLOW_PASSWORD_CHANGE_PENDING,
   IS_PUBLIC,
   REQUIRED_PERMISSIONS,
@@ -16,6 +18,7 @@ import {
 import { PrincipalLoader } from '../access/principal.loader.js';
 import { SessionService, sessionCookieName } from './session.service.js';
 import { PrismaService } from '../core/prisma.service.js';
+import { SystemService } from '../system/system.js';
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
@@ -31,6 +34,7 @@ export class AuthGuard implements CanActivate {
     private readonly sessions: SessionService,
     private readonly principals: PrincipalLoader,
     private readonly prisma: PrismaService,
+    private readonly system: SystemService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -58,6 +62,14 @@ export class AuthGuard implements CanActivate {
     req.principal = principal;
     req.sessionId = session.sessionId;
     req.csrfToken = session.csrfToken;
+
+    // Maintenance mode: only administrators (settings.manage) keep working.
+    if (!principal.hasGlobal('settings.manage') && !this.reflector.getAllAndOverride<boolean>(ALLOW_DURING_MAINTENANCE, targets)) {
+      const m = await this.system.maintenance();
+      if (m.enabled) {
+        throw new ServiceUnavailableException(m.message ? `JobFlow is under maintenance: ${m.message}` : 'JobFlow is under maintenance. Please try again later.');
+      }
+    }
 
     if (
       principal.mustChangePassword &&

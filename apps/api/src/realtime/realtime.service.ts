@@ -37,7 +37,26 @@ export class RealtimeService implements OnApplicationShutdown {
   }
 
   async attach(server: HttpServer): Promise<void> {
-    const io = new Server(server, { path: '/socket.io', serveClient: false, cors: undefined, transports: ['websocket', 'polling'] });
+    const io = new Server(server, {
+      path: '/socket.io',
+      serveClient: false,
+      cors: undefined,
+      transports: ['websocket', 'polling'],
+      // Defence in depth next to the SameSite=Strict cookie: refuse handshakes
+      // started by pages from another origin (cross-site WebSocket hijacking).
+      allowRequest: (req, done) => {
+        const origin = req.headers.origin;
+        if (!origin) return done(null, true);
+        let host: string | null = null;
+        try {
+          host = new URL(origin).host;
+        } catch {
+          host = null;
+        }
+        const expected = (req.headers['x-forwarded-host'] as string | undefined) ?? req.headers.host;
+        done(null, !!host && host === expected);
+      },
+    });
     const url = process.env['REDIS_URL'];
     if (url) {
       try {

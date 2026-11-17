@@ -1,5 +1,62 @@
 # Changelog
 
+## Phase 7 — Hardening, backups, maintenance and acceptance (unreleased)
+
+### Added
+- Backups (`deploy/scripts/backup.sh`): daily verified `pg_dump` (checked with
+  `pg_restore --list`, SHA-256, kept 14 days); nightly encrypted Restic
+  snapshot of uploads, database dumps, the HTTPS root certificate and
+  `deploy/.env` with retention (14 daily, 8 weekly, 12 monthly) and a partial
+  data check; weekly copy to an external disk (refuses to run unless the disk's
+  marker file is present). systemd timers in `deploy/systemd/`, installed by
+  `deploy/scripts/install-backups.sh`.
+- Restore (`deploy/scripts/restore.sh`): `test` restores a snapshot into a
+  throw-away PostgreSQL with no network and verifies every uploaded file
+  against the SHA-256 in the database (monthly timer); `production` restores
+  the live system with confirmation, a safety backup and maintenance mode;
+  `--dump` restores only the database.
+- Updates and rollback: `deploy/scripts/update.sh` (maintenance mode,
+  pre-update backup, keeps the previous images) and `rollback.sh` (restores the
+  pre-update database when the update added migrations).
+- `deploy/scripts/verify.sh`: post-install/post-reboot check with
+  `snapshot`/`compare` of row counts, upload checksums and the HTTPS root
+  certificate.
+- Maintenance mode: only administrators can work while it is on; others see
+  the message and are let back in automatically. Toggle in *Administration →
+  System* or with `node dist/cli/maintenance.js on|off|status`. Audited.
+- *Administration → System*: database, worker heartbeat, API uptime, data-disk
+  space (warning above 85%), outbox waiting/retrying/dead, the last backup,
+  external copy and restore test with warnings, maintenance mode, and the
+  dead-letter list with **Retry**.
+- API: `GET /system/status`, `GET /system/outbox`, `POST /system/outbox/{id}/retry`,
+  `GET|PUT /system/maintenance`.
+- Docs: `docs/maintenance.md` (backups, restore, disaster recovery,
+  maintenance mode, updates, rollback, reboots, monitoring),
+  `docs/acceptance.md` (all 24 acceptance tests mapped to evidence, operations
+  test results, load check, checklist for the target server),
+  `docs/security-review.md`.
+
+### Security
+- `uuid` pinned to 11.1.1 (npm override) for ExcelJS: `npm audit` reports 0
+  vulnerabilities.
+- API Content-Security-Policy reduced to `default-src 'none'` (no Helmet
+  defaults allowing `https:` sources).
+- Socket.IO refuses handshakes from other origins.
+
+### Fixed
+- The worker did not exit on SIGTERM while connected to Redis and was killed
+  after 30 seconds; it now stops within a second.
+- `restore.sh production` checks for every required tool before stopping
+  services.
+
+### Verified
+- Full Vehicle Branding lifecycle in the browser with all traffic to the
+  internet dropped: 0 requests outside the LAN (acceptance test 22).
+- Backup → restore test → damaged-file detection → production restore
+  (acceptance test 23).
+- Docker daemon restart: all services back by restart policy, data identical
+  (acceptance test 24).
+
 ## Phase 6 — Dashboards and reports (unreleased)
 
 ### Added

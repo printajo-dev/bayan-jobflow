@@ -38,9 +38,13 @@ export function configureApp(app: INestApplication): void {
   express.disable('x-powered-by');
   app.use(
     helmet({
+      // The API only returns JSON and files; nothing it serves may load anything.
       contentSecurityPolicy: {
+        useDefaults: false,
         directives: {
           defaultSrc: ["'none'"],
+          baseUri: ["'none'"],
+          formAction: ["'none'"],
           frameAncestors: ["'none'"],
         },
       },

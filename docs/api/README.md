@@ -16,3 +16,9 @@
   `GET /reports/{key}?from=YYYY-MM-DD&to=YYYY-MM-DD&group=month|week&format=json|csv|xlsx`
   runs one (`csv`/`xlsx` need `report.export`). `GET /dashboard` returns the
   caller's role-aware dashboard.
+- System (administrators): `GET /system/status` (health, disk, outbox, backups;
+  `outbox.manage`), `GET /system/outbox?status=DEAD|FAILED`,
+  `POST /system/outbox/{id}/retry`, `GET /system/maintenance` (public) and
+  `PUT /system/maintenance` (`settings.manage`). While maintenance mode is on,
+  every authenticated route except `/auth/me` and `/auth/logout` answers `503`
+  for users without `settings.manage`.

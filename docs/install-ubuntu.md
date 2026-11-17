@@ -57,7 +57,9 @@ Business data lives under `/srv/company-data/` (separate from the code):
 | `redis/` | Redis queue data |
 | `caddy/data/` | Caddy's HTTPS root certificate and key — **back this up** |
 | `files/` | Uploaded files (from Phase 3) |
-| `backups/`, `imports/`, `exports/` | Backup staging and controlled import/export |
+| `backups/` | Database dumps and the encrypted Restic repository (`docs/maintenance.md`) |
+| `backup-status/` | Last backup results, shown on *Administration → System* (no secrets) |
+| `imports/`, `exports/` | Controlled import/export |
 
 Check the services:
 
@@ -152,18 +154,29 @@ nmap -p 22,80,443,3000,5432,6379 192.168.1.50
 Expected: 22, 80 and 443 open; 3000, 5432 and 6379 closed or filtered. Do not
 set up port forwarding on the router.
 
-## 7. Updates
+## 7. Backups
+
+Set up backups before anyone uses the system:
 
 ```bash
-cd /srv/bayan-jobflow
-git pull
-cd deploy
-docker compose build
-docker compose up -d      # the migrate service applies new migrations first
+sudo ./deploy/scripts/install-backups.sh
 ```
 
-Take a backup before every update (backup and restore scripts arrive in
-Phase 7; until then, `docker compose exec postgres pg_dump -U jobflow -Fc jobflow > /srv/company-data/backups/jobflow-$(date +%F).dump`).
+It installs Restic, creates the encrypted backup repository and the daily,
+nightly, weekly and monthly timers, and prints the backup password — print it
+and keep it in the office safe. Prepare the external backup disk first; see
+`docs/maintenance.md` §2. Then run the acceptance checks in `docs/acceptance.md`
+(*On the target server*).
+
+## 8. Updates
+
+```bash
+sudo ./deploy/scripts/update.sh
+```
+
+It turns maintenance mode on, backs up the database, builds and starts the new
+version and turns maintenance mode off; `deploy/scripts/rollback.sh` returns to
+the previous version. Details: `docs/maintenance.md` §7–8.
 
 ## Optional: an internal DNS name
 

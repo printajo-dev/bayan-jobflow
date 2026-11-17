@@ -1,0 +1,11 @@
+[Unit]
+Description=Nightly JobFlow file backup
+
+[Timer]
+OnCalendar=*-*-* 02:30
+Persistent=true
+RandomizedDelaySec=10min
+Unit=jobflow-backup@files.service
+
+[Install]
+WantedBy=timers.target

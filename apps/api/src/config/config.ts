@@ -26,6 +26,8 @@ const envSchema = z.object({
   UPLOAD_MAX_MB: z.coerce.number().int().min(1).max(4096).default(200),
   /** Serve Swagger UI at /api/v1/docs. Off in production unless an admin enables it. */
   API_DOCS: bool.default(false),
+  /** Written by deploy/scripts/backup.sh; shown on the System status page. */
+  BACKUP_STATUS_FILE: z.string().default('/data/backups/status.json'),
 });
 
 export type AppConfig = z.infer<typeof envSchema>;

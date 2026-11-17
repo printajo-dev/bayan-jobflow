@@ -17,6 +17,10 @@
 npm 11 blocks dependency install scripts unless approved; the approved list is
 `allowScripts` in the root `package.json` (argon2, prisma, @prisma/engines).
 
+`overrides` in the root `package.json` pins `uuid` to 11.1.1 for ExcelJS
+(advisory GHSA-w5hq-g745-h8pq); remove it once ExcelJS depends on a fixed
+version itself. Run `npm audit` before each release.
+
 ## Layout
 
 ```

@@ -21,6 +21,7 @@ import { JobPage } from './pages/jobs/JobPage';
 import { MyWorkPage } from './pages/MyWorkPage';
 import { NotificationsPage } from './pages/NotificationsPage';
 import { ReportsPage } from './pages/ReportsPage';
+import { SystemPage } from './pages/admin/SystemPage';
 
 const PASSWORD_PATH = '/account/password';
 
@@ -83,6 +84,7 @@ export const routes = [
               { path: '/admin/roles/:id', element: <RoleDetailPage /> },
             ],
           },
+          { element: <RequirePermission permission="outbox.manage" />, children: [{ path: '/admin/system', element: <SystemPage /> }] },
           { element: <RequirePermission permission="audit.view" />, children: [{ path: '/admin/audit', element: <AuditPage /> }] },
           { path: '*', element: <Navigate to="/" replace /> },
         ],

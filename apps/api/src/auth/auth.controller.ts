@@ -8,7 +8,7 @@ import {
   type CurrentUserDto,
   type LoginInput,
 } from '@jobflow/shared';
-import { AllowPasswordChangePending, CurrentPrincipal, Public } from '../access/decorators.js';
+import { AllowDuringMaintenance, AllowPasswordChangePending, CurrentPrincipal, Public } from '../access/decorators.js';
 import type { Principal } from '../access/principal.js';
 import { AuthService, type LoginContext } from './auth.service.js';
 import { type IssuedSession, sessionCookieName, sessionCookieOptions } from './session.service.js';
@@ -44,6 +44,7 @@ export class AuthController {
 
   @AllowPasswordChangePending()
   @Post('logout')
+  @AllowDuringMaintenance()
   @HttpCode(204)
   async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response): Promise<void> {
     await this.auth.logout(req.sessionId!, loginContext(req));
@@ -52,6 +53,7 @@ export class AuthController {
 
   @AllowPasswordChangePending()
   @Get('me')
+  @AllowDuringMaintenance()
   me(@CurrentPrincipal() principal: Principal, @Req() req: Request): Promise<CurrentUserDto> {
     return this.auth.currentUser(principal.userId, req.csrfToken!);
   }

@@ -5,6 +5,7 @@ import { config } from './config/config.js';
 import { createPrismaClient } from './core/prisma.service.js';
 import { OutboxRelay } from './outbox/outbox.relay.js';
 import { Notifier, type Push } from './notifications/notifier.js';
+import { WORKER_HEARTBEAT_KEY } from './system/system.js';
 
 /**
  * Background worker:
@@ -20,12 +21,14 @@ const log = (level: 'log' | 'error' | 'warn', msg: string) =>
   (level === 'error' ? console.error : console.log)(JSON.stringify({ level, context: 'Worker', msg, time: new Date().toISOString() }));
 
 let push: Push | null = null;
+let redis: { quit: () => Promise<unknown> } | null = null;
 const redisUrl = process.env['REDIS_URL'];
 if (redisUrl) {
   try {
     const client = createClient({ url: redisUrl, socket: { reconnectStrategy: (n) => Math.min(n * 500, 10_000) } });
     client.on('error', (e) => log('warn', `Redis: ${e.message}`));
     await client.connect();
+    redis = client;
     const emitter = new Emitter(client);
     push = { toUser: (userId, event, payload) => void emitter.to(`user:${userId}`).emit(event, payload) };
   } catch (e) {
@@ -44,11 +47,18 @@ process.on('SIGINT', () => (stopping = true));
 log('log', 'Worker started');
 let lastStuckCheck = 0;
 let lastReminder = 0;
+let lastHeartbeat = 0;
 while (!stopping) {
   try {
     if (Date.now() - lastStuckCheck > 60_000) {
       await relay.releaseStuck();
       lastStuckCheck = Date.now();
+    }
+    if (Date.now() - lastHeartbeat > 60_000) {
+      // Shown on the administrators' System status page.
+      const value = { at: new Date().toISOString() };
+      await prisma.systemSetting.upsert({ where: { key: WORKER_HEARTBEAT_KEY }, create: { key: WORKER_HEARTBEAT_KEY, value }, update: { value } });
+      lastHeartbeat = Date.now();
     }
     if (Date.now() - lastReminder > 15 * 60_000) {
       const n = await notifier.taskReminders();
@@ -63,4 +73,5 @@ while (!stopping) {
   }
 }
 await prisma.$disconnect();
+await redis?.quit().catch(() => undefined);
 log('log', 'Worker stopped');

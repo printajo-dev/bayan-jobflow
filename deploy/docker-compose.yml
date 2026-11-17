@@ -17,6 +17,8 @@ x-api-env: &api-env
   LOGIN_LOCK_MINUTES: ${LOGIN_LOCK_MINUTES:-15}
   FILES_ROOT: /data/files
   UPLOAD_MAX_MB: ${UPLOAD_MAX_MB:-200}
+  BACKUP_STATUS_FILE: /data/backup-status/status.json
+  JOBFLOW_RELEASE: ${JOBFLOW_RELEASE:-dev}
 
 services:
   postgres:
@@ -72,6 +74,8 @@ services:
     volumes:
       # Uploaded files; owned by uid 1000 (the container's "node" user).
       - ${DATA_ROOT:-/srv/company-data}/files:/data/files
+      # Written by deploy/scripts/backup.sh; shown on Administration → System.
+      - ${DATA_ROOT:-/srv/company-data}/backup-status:/data/backup-status:ro
     networks: [backend]
     depends_on:
       migrate: { condition: service_completed_successfully }

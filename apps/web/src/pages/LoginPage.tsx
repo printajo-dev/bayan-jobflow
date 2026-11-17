@@ -3,6 +3,7 @@ import { Navigate } from 'react-router';
 import { Alert, Button, Center, Paper, PasswordInput, Stack, Text, TextInput, Title } from '@mantine/core';
 import { useAuth } from '../auth/AuthContext';
 import { errorMessage } from '../components/states';
+import { MaintenanceBanner, useMaintenance } from '../components/Maintenance';
 
 export function LoginPage() {
   const { me, login } = useAuth();
@@ -10,6 +11,7 @@ export function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const maintenance = useMaintenance().data;
 
   if (me) return <Navigate to="/" replace />;
 
@@ -32,6 +34,7 @@ export function LoginPage() {
       <Paper withBorder shadow="sm" p="xl" radius="md" w={380}>
         <form onSubmit={submit}>
           <Stack>
+            {maintenance?.enabled && <MaintenanceBanner state={maintenance} admin={false} />}
             <div>
               <Title order={2}>Bayan JobFlow</Title>
               <Text c="dimmed" size="sm">

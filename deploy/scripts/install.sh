@@ -22,11 +22,14 @@ if [[ -z "${POSTGRES_PASSWORD:-}" || -z "${REDIS_PASSWORD:-}" ]]; then
 fi
 
 echo "Creating data folders under ${DATA_ROOT} (needs sudo)…"
-sudo mkdir -p "${DATA_ROOT}"/{postgres,redis,caddy/data,caddy/config,files,backups,imports,exports}
+sudo mkdir -p "${DATA_ROOT}"/{postgres,redis,caddy/data,caddy/config,files,backups,backup-status,imports,exports}
 sudo chmod 700 "${DATA_ROOT}/postgres" "${DATA_ROOT}/backups"
 # The API container runs as uid 1000 and must be able to write uploads.
 sudo chown -R 1000:1000 "${DATA_ROOT}/files"
 sudo chmod 750 "${DATA_ROOT}/files"
+
+if ! grep -q '^JOBFLOW_RELEASE=' .env; then echo "JOBFLOW_RELEASE=$(git -C .. describe --tags --always)" >> .env; fi
+set -a; source .env; set +a
 
 echo "Building images…"
 docker compose build
@@ -43,4 +46,6 @@ Next steps:
   1. Create the first administrator:   ./deploy/scripts/create-admin.sh
   2. Export the HTTPS root certificate: ./deploy/scripts/export-ca.sh
      and install it on each office PC (docs/install-ubuntu.md).
+  3. Set up backups:                    sudo ./deploy/scripts/install-backups.sh
+     (docs/maintenance.md; plug in the external backup disk first).
 MSG

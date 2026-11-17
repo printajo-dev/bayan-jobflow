@@ -1,4 +1,5 @@
 import type { INestApplication } from '@nestjs/common';
+import request from 'supertest';
 import type { JobDetailDto, StageDto, WorkflowDto } from '@jobflow/shared';
 import { API, signIn, type SignedIn } from './helpers.js';
 
@@ -59,6 +60,15 @@ export class Actors {
   async patch(username: string, path: string, body: object) {
     const s = await this.as(username);
     return s.agent.patch(`${API}${path}`).set('X-CSRF-Token', s.csrf).send(body);
+  }
+
+  async put(username: string, path: string, body: object) {
+    const s = await this.as(username);
+    return s.agent.put(`${API}${path}`).set('X-CSRF-Token', s.csrf).send(body);
+  }
+
+  anonymous() {
+    return request(this.app.getHttpServer());
   }
 
   async get(username: string, path: string) {

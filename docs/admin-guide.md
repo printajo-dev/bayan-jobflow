@@ -84,3 +84,22 @@ templates and their versions.
 *Administration → Settings → Job Number*: optionally set a regular expression
 the Job Number must match (for example `INV-[0-9]{5}`) and an example shown to
 Sales. Leave empty to accept any unique number. Existing jobs are not affected.
+
+## System status and maintenance mode
+
+*Administration → System* (permission *outbox.manage*) shows the health of the
+database and background worker, free disk space, background events and the
+last backups (database, files, external copy, restore test), with warnings when
+something failed or is overdue.
+
+- **Failed background events**: events (mostly notifications) that failed
+  after every retry. Fix the cause shown in *Last error*, then press **Retry**.
+  Workflow progress never depends on these events, and retrying cannot create
+  duplicates.
+- **Maintenance mode** (permission *settings.manage*): while on, only
+  administrators can use JobFlow; everyone else sees your message and is let
+  back in automatically when you turn it off. Use it before updates and
+  restores. Both changes are recorded in the audit log.
+
+Backups, restores, updates and rollback are done on the server: see
+`docs/maintenance.md`.

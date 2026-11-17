@@ -6,6 +6,7 @@ import type { Principal } from './principal.js';
 export const IS_PUBLIC = 'jobflow:isPublic';
 export const REQUIRED_PERMISSIONS = 'jobflow:requiredPermissions';
 export const ALLOW_PASSWORD_CHANGE_PENDING = 'jobflow:allowPasswordChangePending';
+export const ALLOW_DURING_MAINTENANCE = 'jobflow:allowDuringMaintenance';
 
 /** Route needs no session (login, health). */
 export const Public = () => SetMetadata(IS_PUBLIC, true);
@@ -16,6 +17,9 @@ export const Public = () => SetMetadata(IS_PUBLIC, true);
  */
 export const RequirePermissions = (...permissions: PermissionKey[]) =>
   SetMetadata(REQUIRED_PERMISSIONS, permissions);
+
+/** Route stays usable for everyone during maintenance (sign-out, who am I). */
+export const AllowDuringMaintenance = () => SetMetadata(ALLOW_DURING_MAINTENANCE, true);
 
 /** Route stays usable while the user must change their password. */
 export const AllowPasswordChangePending = () => SetMetadata(ALLOW_PASSWORD_CHANGE_PENDING, true);

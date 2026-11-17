@@ -4,6 +4,7 @@ import { useDisclosure } from '@mantine/hooks';
 import type { PermissionKey } from '@jobflow/shared';
 import { useAuth } from '../auth/AuthContext';
 import { NotificationBell } from './NotificationBell';
+import { MaintenanceBanner, MaintenanceScreen, useMaintenance } from './Maintenance';
 
 interface NavItem {
   to: string;
@@ -26,6 +27,7 @@ export const ADMIN_NAV: NavItem[] = [
   { to: '/admin/templates', label: 'Workflow templates', permission: 'template.manage' },
   { to: '/admin/settings', label: 'Settings', permission: 'settings.manage' },
   { to: '/admin/audit', label: 'Audit log', permission: 'audit.view' },
+  { to: '/admin/system', label: 'System', permission: 'outbox.manage' },
 ];
 
 export function Layout() {
@@ -33,6 +35,8 @@ export function Layout() {
   const [opened, { toggle, close }] = useDisclosure();
   const location = useLocation();
   const forced = me?.user.mustChangePassword ?? false;
+  const maintenance = useMaintenance().data;
+  const isAdmin = can('settings.manage');
   const admin = ADMIN_NAV.filter((i) => !i.permission || can(i.permission));
 
   const link = (i: NavItem) => (
@@ -103,7 +107,8 @@ export function Layout() {
       </AppShell.Navbar>
 
       <AppShell.Main>
-        <Outlet />
+        {maintenance?.enabled && isAdmin && <MaintenanceBanner state={maintenance} admin />}
+        {maintenance?.enabled && !isAdmin ? <MaintenanceScreen state={maintenance} /> : <Outlet />}
       </AppShell.Main>
     </AppShell>
   );

@@ -48,7 +48,7 @@ describe('Phase 6: dashboards and reports', () => {
   });
   afterAll(async () => app.close());
 
-  it('AT19: dashboards are role-aware', async () => {
+  it('dashboards are role-aware', async () => {
     const mgmt = (await as.get('demo.management', '/dashboard'))
       .body as DashboardDto;
     expect(mgmt.overview).not.toBeNull();
