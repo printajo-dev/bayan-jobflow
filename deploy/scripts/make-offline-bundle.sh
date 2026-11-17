@@ -66,7 +66,7 @@ docker run --rm --platform linux/amd64 "${EXTRA_RUN[@]}" -v "$out/debs:/out" "$U
   rm -f /var/cache/apt/archives/*.deb
   apt-get install -y -qq --download-only --no-install-recommends \
     docker-ce docker-ce-cli containerd.io docker-compose-plugin docker-buildx-plugin \
-    restic jq rsync iptables git >/dev/null
+    restic jq rsync iptables git openssl curl ca-certificates >/dev/null
   cp /var/cache/apt/archives/*.deb /out/
   chown -R '"$(id -u):$(id -g)"' /out'
 
