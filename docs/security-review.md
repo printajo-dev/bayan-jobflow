@@ -42,6 +42,41 @@ implemented and the test that proves it.
    in the middle of a batch.
 5. **Restore script** checks every required tool before stopping any service.
 
+## Second review: three independent code reviews before release
+
+Three separate reviews covered the API core (auth, access, workflow engine),
+collaboration (files, discussions, realtime, notifications) and operations
+(PRO, schedule, production, QC, reports, web app, deployment scripts). Every
+finding was checked against the code; the confirmed ones are fixed, and the
+important ones have regression tests in `apps/api/test/hardening.e2e-spec.ts`.
+
+| Finding | Severity | Fix |
+|---|---|---|
+| A signed-in user could crash the API through the live-update socket (non-function acknowledgement in an async handler) | High | Input checked, handler guarded, process logs instead of exiting on stray rejections |
+| Live-update sockets kept their access after logout, account disable, role change or participant removal | High | Sockets re-checked every minute and on every channel join; disable/reset and participant removal take effect immediately |
+| Backups that failed could be recorded as successful (`set -e` is ignored inside `if`) | High | Steps run outside conditions; `pg_dump` status checked; wrong Restic password reported clearly |
+| `restore.sh production --dump` could reuse files from an interrupted earlier restore and delete newer uploads | High | Work folder always cleared; files only restored from a snapshot restored in the same run |
+| Parallel wrong passwords did not lock the account | Medium | Failure count incremented atomically in PostgreSQL |
+| Login throttle per API instance | Medium | Counters shared in Redis across instances |
+| Change-password had no attempt limit | Low | Throttled; wrong current passwords count towards the lockout and end all sessions at the limit |
+| Tasks of another department readable by id or in the job's task list | Medium | Visible only to the department (task.view) and the assignees; others get 404 |
+| Upload temp files left behind when validation failed | Medium | Removed when every response ends; hourly sweep as a safety net |
+| Artwork stored before the transaction that could reject it | Medium | Validated first; stored file purged if the transaction fails |
+| Reply notifications to users who lost access; deleted text in notification excerpts | Medium/Low | Access checked; deleted messages never quoted |
+| Overdue reminders popped up again every 15 minutes | Medium | Live alerts only for newly created notifications; reminded tasks skipped |
+| Any PRO officer could cancel an approval, bypassing the Not Required rule | Medium | Cancel and reopen limited to the PRO Leader and administrators |
+| Vehicle schedule could be marked completed without confirmation, or re-timed while staying confirmed | Medium | Status transitions enforced; re-timing needs a reason and a new confirmation |
+| Reports and dashboard used UTC days instead of Dubai days | Medium | Office time zone for periods, "today", grouping and displayed times |
+| Failed update left the system in maintenance mode; rollback could start old code on a new database | Medium | Maintenance restored on failure; rollback checks images and the pre-update backup first; pre-update backups kept |
+| Admin-only permissions honoured when granted in a department role | Low | Must be granted globally |
+| Client-supplied request id used in idempotency keys | Low | Server-generated ids only |
+| Last-administrator check racy; brief edits and template edits racing stage completion/publishing; trigger rejections as 500; duplicate task assignees; removed files usable as receipts; `corrections/mine` ignoring job access; N+1 queries on the Operations tab and in reminders; QC defect text attached to the wrong items in the web form | Low | All fixed |
+
+**Accepted:** after five wrong passwords an existing account answers "locked"
+(423) while an unknown username keeps answering "invalid" (401), which reveals
+that the account exists. On an office LAN, telling staff clearly that their
+account is locked is worth more than hiding which usernames exist.
+
 ## Residual risks and recommendations
 
 | Risk | Rating | Recommendation |

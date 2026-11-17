@@ -4,8 +4,13 @@ This guide installs JobFlow on one server in the office. Staff open it at
 `https://<server IP>` from office PCs and tablets. Nothing is exposed to the
 internet, and the system keeps working when the internet connection is down.
 
-Internet is needed only during installation and updates (to download Docker,
-base images and packages).
+**Server without internet (the normal case for Bayan):** follow
+[install-offline.md](install-offline.md) instead of sections 1–3 below. A PC
+with internet prepares one bundle file; the server installs and updates from
+it and never needs internet. Sections 4–7 apply to both.
+
+This page describes the alternative where the server has internet during
+installation and updates (to download Docker, base images and packages).
 
 ## 1. Prepare the server
 

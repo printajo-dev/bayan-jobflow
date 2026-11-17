@@ -1,5 +1,33 @@
 # Changelog
 
+## Release hardening — review fixes, speed, offline installation (unreleased)
+
+### Added
+- **Offline installation and updates.** `deploy/scripts/make-offline-bundle.sh`
+  (on any PC with internet) builds one file with the images, the Ubuntu 24.04
+  packages for Docker, Restic, jq, rsync and git, and the code;
+  `install-offline.sh` installs the server from it and `update.sh <bundle>`
+  updates it. The server never needs internet. Guide: `docs/install-offline.md`.
+- Scaling: Caddy discovers API containers through Docker DNS, so
+  `docker compose up -d --scale api=N` spreads the load (sticky live updates);
+  `DB_POOL_MAX` sets database connections per API container.
+- Regression tests for the review findings (`test/hardening.e2e-spec.ts`).
+
+### Fixed
+- Three independent code reviews; every confirmed finding fixed. The full
+  list with severities is in `docs/security-review.md` (second review). Most
+  important: a socket message could crash the API; live-update access was not
+  re-checked after logout or access changes; failed backups could be reported
+  as successful; a database-only restore could delete newer uploads; parallel
+  wrong passwords did not lock accounts; other departments' tasks were
+  readable by id; reports used UTC days instead of Dubai days.
+
+### Performance
+- Dashboard: a fixed handful of queries instead of about eight per department.
+- Operations tab and task reminders: no per-row queries.
+- New indexes for open corrections per department, the notification list and
+  active task assignments.
+
 ## Phase 7 — Hardening, backups, maintenance and acceptance (unreleased)
 
 ### Added

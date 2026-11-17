@@ -14,6 +14,7 @@ if [[ ! -f .env ]]; then
   exit 0
 fi
 
+SUDO=""; [[ $EUID -eq 0 ]] || SUDO=sudo
 set -a; source .env; set +a
 : "${JOBFLOW_HOST:?JOBFLOW_HOST missing in deploy/.env}"
 : "${DATA_ROOT:?DATA_ROOT missing in deploy/.env}"
@@ -21,12 +22,12 @@ if [[ -z "${POSTGRES_PASSWORD:-}" || -z "${REDIS_PASSWORD:-}" ]]; then
   echo "POSTGRES_PASSWORD and REDIS_PASSWORD must be set in deploy/.env" >&2; exit 1
 fi
 
-echo "Creating data folders under ${DATA_ROOT} (needs sudo)…"
-sudo mkdir -p "${DATA_ROOT}"/{postgres,redis,caddy/data,caddy/config,files,backups,backup-status,imports,exports}
-sudo chmod 700 "${DATA_ROOT}/postgres" "${DATA_ROOT}/backups"
+echo "Creating data folders under ${DATA_ROOT}…"
+$SUDO mkdir -p "${DATA_ROOT}"/{postgres,redis,caddy/data,caddy/config,files,backups,backup-status,imports,exports}
+$SUDO chmod 700 "${DATA_ROOT}/postgres" "${DATA_ROOT}/backups"
 # The API container runs as uid 1000 and must be able to write uploads.
-sudo chown -R 1000:1000 "${DATA_ROOT}/files"
-sudo chmod 750 "${DATA_ROOT}/files"
+$SUDO chown -R 1000:1000 "${DATA_ROOT}/files"
+$SUDO chmod 750 "${DATA_ROOT}/files"
 
 if ! grep -q '^JOBFLOW_RELEASE=' .env; then echo "JOBFLOW_RELEASE=$(git -C .. describe --tags --always)" >> .env; fi
 set -a; source .env; set +a

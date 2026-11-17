@@ -19,7 +19,7 @@ target server before go-live. See [CHANGELOG.md](CHANGELOG.md).
 
 Using JobFlow: [docs/user-guide.md](docs/user-guide.md). API: [docs/api/](docs/api/).
 
-Install on the office server: [docs/install-ubuntu.md](docs/install-ubuntu.md).
+Install on the office server (no internet needed): [docs/install-offline.md](docs/install-offline.md); with internet: [docs/install-ubuntu.md](docs/install-ubuntu.md).
 Administer users and roles: [docs/admin-guide.md](docs/admin-guide.md).
 Backups, restore, updates, rollback: [docs/maintenance.md](docs/maintenance.md).
 Develop and test: [docs/development.md](docs/development.md).

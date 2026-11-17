@@ -174,19 +174,30 @@ themselves. Turning it on or off is recorded in the audit log.
 
 ## 7. Updating
 
+The server has no internet, so updates come as an offline bundle made on a PC
+with internet (`docs/install-offline.md` §1):
+
 ```bash
-sudo ./deploy/scripts/update.sh            # newest version of the current branch
-sudo ./deploy/scripts/update.sh v1.2.0     # a specific release
+sudo ./deploy/scripts/update.sh /mnt/jobflow-offline-v1.2.0.tar
 ```
 
-The script: checks there are no local changes, turns maintenance mode on,
-takes a database backup, keeps the running images as `:previous`, fetches the
-new version, builds it, starts it (database migrations run first, on their
-own), waits until it is healthy and turns maintenance mode off. Read the
-CHANGELOG first and update outside working hours.
+(With internet on the server, `update.sh v1.2.0` or plain `update.sh` fetch
+and build from GitHub instead.)
 
-If the new version does not start, the script stops with the logs and
-maintenance mode stays on. Then roll back.
+The script checks the bundle's checksums, turns maintenance mode on, takes a
+database backup kept in `/srv/company-data/backups/pre-update/` (the last three
+are kept, outside the 14-day cleanup), keeps the running images as `:previous`,
+loads the new images and code, starts them (database migrations run first, on
+their own), waits until they are healthy and turns maintenance mode off. Read
+the CHANGELOG first and update outside working hours.
+
+- If anything fails **before** the new version starts (damaged bundle, backup
+  error), the running version is left untouched and maintenance mode is turned
+  off again.
+- If the new version **does not start**, the script prints the logs and
+  maintenance mode stays on. Roll back (§8).
+- `update.sh` refuses to run again while the last update is unfinished, so a
+  broken version can never become the "previous" one.
 
 ## 8. Rolling back
 
@@ -194,12 +205,16 @@ maintenance mode stays on. Then roll back.
 sudo ./deploy/scripts/rollback.sh
 ```
 
-Returns to the version that ran before the last `update.sh` (the code and the
-`:previous` images). Migrations only move forward, so **if the update changed
-the database**, the rollback also restores the database backup taken just
-before the update, and the script says so before you confirm. Anything entered
-between the update and the rollback is then lost; roll back quickly, or ask for
-a fix instead if users have already entered a lot of work.
+Returns to the version that ran before the last `update.sh`, also when that
+update failed to start: the code and the `:previous` images are already on the
+server, so no internet is needed. Migrations only move forward, so **if the
+update changed the database**, the rollback also restores the database backup
+taken just before the update, and the script says so before you confirm.
+Anything entered between the update and the rollback is then lost; roll back
+quickly, or ask for a fix instead if users have already entered a lot of work.
+
+Before it changes anything, the script checks that the previous images and
+(when needed) the pre-update backup exist, and stops if not.
 
 ## 9. Reboots and power cuts
 
@@ -250,3 +265,25 @@ Pinned versions (Node.js 26 LTS, PostgreSQL 17.12, Redis 8.2.11, Caddy 2.11.9,
 npm packages in `package-lock.json`) are listed in `docs/development.md`. Check
 for security releases every quarter, update the pins in a branch, run the test
 suite, then deploy with `update.sh`.
+
+## 13. More users: scaling
+
+One server comfortably handles an office of 50 users (`docs/acceptance.md`,
+load check). If it ever gets slow at busy times:
+
+1. Check *Administration → System* and `docker stats` for the bottleneck.
+2. Run more API containers (the web server spreads the load over them on its
+   own; live updates keep working through Redis):
+
+   ```bash
+   cd /srv/bayan-jobflow/deploy
+   docker compose up -d --scale api=3
+   ```
+
+   Each API container keeps up to `DB_POOL_MAX` (default 20) database
+   connections; keep `api containers × DB_POOL_MAX + 15` under 100, or lower
+   `DB_POOL_MAX` in `deploy/.env`.
+3. More memory and faster disks for PostgreSQL help most with large reports.
+
+To make the number permanent, add `deploy: { replicas: 3 }` under `api:` in a
+`docker-compose.override.yml` next to `docker-compose.yml`.

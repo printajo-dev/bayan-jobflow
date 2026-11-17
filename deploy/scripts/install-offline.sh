@@ -34,7 +34,12 @@ if compgen -G "$pick/*.deb" >/dev/null; then
 else
   log "All packages already installed"
 fi
-systemctl enable --now docker
+if [[ -d /run/systemd/system ]]; then
+  systemctl enable --now docker
+else
+  log "warning: systemd is not running; start dockerd yourself"
+fi
+for _ in $(seq 1 30); do docker info >/dev/null 2>&1 && break; sleep 1; done
 docker compose version >/dev/null || die "Docker Compose did not install"
 
 log "Loading images (this takes a few minutes)"
