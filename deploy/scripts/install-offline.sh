@@ -25,7 +25,9 @@ log "Installing system packages from the bundle"
 pick="$(mktemp -d)"; trap 'rm -rf "$pick"' EXIT
 for deb in debs/*.deb; do
   pkg="$(dpkg-deb -f "$deb" Package)"; ver="$(dpkg-deb -f "$deb" Version)"
-  have="$(dpkg-query -W -f='${Status} ${Version}' "$pkg" 2>/dev/null | awk '/install ok installed/ {print $4}')"
+  # dpkg-query fails for packages that are not installed: that is expected here.
+  status="$(dpkg-query -W -f='${Status} ${Version}' "$pkg" 2>/dev/null || true)"
+  have="$(awk '/install ok installed/ {print $4}' <<<"$status")"
   # Never downgrade what the server already has.
   if [[ -z "$have" ]] || dpkg --compare-versions "$have" lt "$ver"; then cp "$deb" "$pick/"; fi
 done
