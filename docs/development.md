@@ -58,7 +58,8 @@ npm run test:e2e -w @jobflow/api  # API tests against a real PostgreSQL
 npm test -w @jobflow/web          # React tests (jsdom)
 ```
 
-The e2e suite creates and drops the database named in `E2E_DATABASE_URL`
+The e2e suite needs `ffmpeg` on the PATH (it generates an over-long voice
+note) and creates and drops the database named in `E2E_DATABASE_URL`
 (default `postgresql://jobflow:jobflow_dev@localhost:5432/jobflow_e2e`), so the
 role needs `CREATEDB`.
 
