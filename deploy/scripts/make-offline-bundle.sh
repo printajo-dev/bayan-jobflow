@@ -55,10 +55,10 @@ log "Downloading Ubuntu 24.04 packages (Docker, Restic, jq, rsync)"
 # dependencies match the server's release.
 docker run --rm --platform linux/amd64 "${EXTRA_RUN[@]}" -v "$out/debs:/out" "$UBUNTU_IMAGE" bash -euc '
   export DEBIAN_FRONTEND=noninteractive
-  [ -d /extra-ca ] && cp /extra-ca/*.crt /usr/local/share/ca-certificates/ 2>/dev/null || true
   apt-get update -qq
   apt-get install -y -qq --no-install-recommends ca-certificates curl gnupg >/dev/null
-  update-ca-certificates >/dev/null 2>&1 || true
+  # Optional extra certificate authority (networks with an HTTPS proxy).
+  if [ -d /extra-ca ]; then cp /extra-ca/*.crt /usr/local/share/ca-certificates/ && update-ca-certificates >/dev/null; fi
   install -m 0755 -d /etc/apt/keyrings
   curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
   echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu noble stable" > /etc/apt/sources.list.d/docker.list
