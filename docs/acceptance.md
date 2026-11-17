@@ -73,13 +73,31 @@ upload checksum were identical and the site answered over HTTPS. The API and
 worker stop within a second on SIGTERM, so shutdowns never hit Docker's kill
 timeout.
 
+**Offline installation (no internet at any point).** `deploy/test/offline-install-test.sh`
+starts a fresh Ubuntu 24.04 machine with **no network at all** (a privileged
+container with `--network none`) and installs the offline bundle made by
+`make-offline-bundle.sh`: Docker 29, Compose, Restic, jq and rsync from the
+bundled packages, the images, the code. JobFlow then started without building
+anything, the first administrator was created and signed in over HTTPS, the
+system was updated from the bundle (maintenance mode on and off again,
+pre-update backup kept), a backup was taken and the restore test passed. This
+test found and fixed three installer bugs that would have stopped a real
+offline installation.
+
 **Load check.** 50 concurrent clients requesting job lists, job details,
 workflows, dashboards, reports and notifications back to back with no pause
-for 30 seconds (as Management, the heaviest dashboard): 5,227 requests,
-174 requests/second, **0 errors**, median 144 ms, 95th percentile 1.1 s
-(queueing for database connections at saturation). Unloaded, each of these
-endpoints answers in 10–60 ms. A real office of 50 users generates well under
-5 requests per second, so there is ample headroom on modest hardware.
+for 30 seconds (as Management, the heaviest dashboard):
+
+| Setup | Requests/s | Errors | Median | 95th percentile | 99th percentile |
+|---|---|---|---|---|---|
+| Before the release hardening | 174 | 0 | 144 ms | 1,127 ms | 1,349 ms |
+| One API container (now) | 262 | 0 | 178 ms | 301 ms | 375 ms |
+| Two API containers (`--scale api=2`) | 380 | 0 | 122 ms | 224 ms | 294 ms |
+
+With two API containers the load was split evenly, and live updates reached
+browsers connected to the other container (Redis). Unloaded, each endpoint
+answers in 10–60 ms. A real office of 50 users generates well under 5
+requests per second.
 
 ## On the target server (before go-live)
 
