@@ -27,6 +27,9 @@ import { FilesController, JobsController } from './jobs/jobs.controller.js';
 import { FilesService } from './files/files.service.js';
 import { RealtimeService } from './realtime/realtime.service.js';
 import { DirectoryController } from './directory.controller.js';
+import { AuthorityService } from './authority/authority.service.js';
+import { OperationsService } from './operations/operations.service.js';
+import { AuthorityController, OperationsController } from './operations.controllers.js';
 import { DiscussionsService } from './discussions/discussions.service.js';
 import { TasksService } from './tasks/tasks.service.js';
 import { DesignService } from './design/design.service.js';
@@ -59,6 +62,8 @@ import { CorrectionsController, DesignController, DiscussionsController, TasksCo
     CorrectionsController,
     NotificationsController,
     DirectoryController,
+    AuthorityController,
+    OperationsController,
   ],
   providers: [
     AuditService,
@@ -81,6 +86,8 @@ import { CorrectionsController, DesignController, DiscussionsController, TasksCo
     DesignService,
     CorrectionsService,
     NotificationsService,
+    AuthorityService,
+    OperationsService,
     { provide: APP_GUARD, useClass: AuthGuard },
     { provide: APP_FILTER, useClass: HttpExceptionFilter },
   ],

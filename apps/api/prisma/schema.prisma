@@ -76,19 +76,22 @@ model User {
   stagesCompleted   DepartmentStage[]    @relation("StageCompletedBy")
   checklistsChecked StageChecklistItem[] @relation("ChecklistCheckedBy")
 
-  taskAssignments      TaskAssignment[]          @relation("TaskAssignee")
-  taskComments         TaskComment[]             @relation("TaskCommentAuthor")
-  roundsRequested      CorrectionRound[]         @relation("RoundRequestedBy")
-  roundsAssigned       CorrectionRound[]         @relation("RoundDesigner")
-  artworkUploaded      ArtworkVersion[]          @relation("ArtworkUploadedBy")
-  approvalsRecorded    ApprovalRecord[]          @relation("ApprovalRecordedBy")
-  channelMemberships   DiscussionChannelMember[] @relation("ChannelMember")
-  messages             DiscussionMessage[]       @relation("MessageAuthor")
-  mentions             DiscussionMention[]       @relation("MentionedUser")
-  correctionsRequested CorrectionItem[]          @relation("CorrectionRequestedBy")
-  correctionsAssigned  CorrectionItem[]          @relation("CorrectionAssignedTo")
-  notifications        Notification[]            @relation("NotificationUser")
-  notificationSettings NotificationPreference[]  @relation("NotificationPreferenceUser")
+  taskAssignments       TaskAssignment[]          @relation("TaskAssignee")
+  taskComments          TaskComment[]             @relation("TaskCommentAuthor")
+  roundsRequested       CorrectionRound[]         @relation("RoundRequestedBy")
+  roundsAssigned        CorrectionRound[]         @relation("RoundDesigner")
+  artworkUploaded       ArtworkVersion[]          @relation("ArtworkUploadedBy")
+  approvalsRecorded     ApprovalRecord[]          @relation("ApprovalRecordedBy")
+  channelMemberships    DiscussionChannelMember[] @relation("ChannelMember")
+  messages              DiscussionMessage[]       @relation("MessageAuthor")
+  mentions              DiscussionMention[]       @relation("MentionedUser")
+  correctionsRequested  CorrectionItem[]          @relation("CorrectionRequestedBy")
+  correctionsAssigned   CorrectionItem[]          @relation("CorrectionAssignedTo")
+  notifications         Notification[]            @relation("NotificationUser")
+  notificationSettings  NotificationPreference[]  @relation("NotificationPreferenceUser")
+  productionOperated    ProductionOrder[]         @relation("ProductionOperator")
+  installationsLed      InstallationOrder[]       @relation("InstallationLeader")
+  installationsAssigned InstallationAssignment[]  @relation("InstallationTechnician")
 
   @@index([status])
   @@map("users")
@@ -395,17 +398,21 @@ model Job {
   createdAt              DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt              DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  serviceType ServiceType         @relation(fields: [serviceTypeId], references: [id], onDelete: Restrict)
-  createdBy   User?               @relation("JobCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
-  brief       JobBrief?
-  workflow    JobWorkflow?
-  files       JobFile[]
-  tasks       Task[]
-  rounds      CorrectionRound[]
-  artwork     ArtworkVersion[]
-  approvals   ApprovalRecord[]
-  channels    DiscussionChannel[]
-  corrections CorrectionItem[]
+  serviceType  ServiceType            @relation(fields: [serviceTypeId], references: [id], onDelete: Restrict)
+  createdBy    User?                  @relation("JobCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  brief        JobBrief?
+  workflow     JobWorkflow?
+  files        JobFile[]
+  tasks        Task[]
+  rounds       CorrectionRound[]
+  artwork      ArtworkVersion[]
+  approvals    ApprovalRecord[]
+  channels     DiscussionChannel[]
+  corrections  CorrectionItem[]
+  authority    AuthorityApplication[]
+  schedules    VehicleSchedule[]
+  production   ProductionOrder[]
+  installation InstallationOrder[]
 
   @@index([status, serviceTypeId])
   @@index([createdAt])
@@ -444,14 +451,15 @@ model File {
   createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   deletedAt    DateTime? @map("deleted_at") @db.Timestamptz(3)
 
-  uploadedBy  User?                  @relation("FileUploadedBy", fields: [uploadedById], references: [id], onDelete: Restrict)
-  jobs        JobFile[]
-  accessLogs  FileAccessLog[]
-  rounds      CorrectionRoundFile[]  @relation("RoundFile")
-  artwork     ArtworkVersion[]       @relation("ArtworkFile")
-  evidence    ApprovalRecord[]       @relation("ApprovalEvidence")
-  messages    DiscussionAttachment[] @relation("MessageFile")
-  corrections CorrectionFile[]       @relation("CorrectionFile")
+  uploadedBy    User?                  @relation("FileUploadedBy", fields: [uploadedById], references: [id], onDelete: Restrict)
+  jobs          JobFile[]
+  accessLogs    FileAccessLog[]
+  rounds        CorrectionRoundFile[]  @relation("RoundFile")
+  artwork       ArtworkVersion[]       @relation("ArtworkFile")
+  evidence      ApprovalRecord[]       @relation("ApprovalEvidence")
+  messages      DiscussionAttachment[] @relation("MessageFile")
+  corrections   CorrectionFile[]       @relation("CorrectionFile")
+  authorityDocs AuthorityDocument[]    @relation("AuthorityFile")
 
   @@map("files")
 }
@@ -537,6 +545,8 @@ model DepartmentStage {
   checklist     StageChecklistItem[]
   transitions   WorkflowTransition[]
   tasks         Task[]
+  production    ProductionOrder[]
+  installation  InstallationOrder[]
 
   @@unique([jobWorkflowId, templateStageId, occurrenceNo])
   @@index([status, departmentId])
@@ -1015,4 +1025,331 @@ model NotificationPreference {
 
   @@id([userId, type])
   @@map("notification_preferences")
+}
+
+// ============================================================ Phase 4
+
+enum AuthorityStatus {
+  NOT_REQUIRED
+  PENDING_PREPARATION
+  READY_TO_SUBMIT
+  SUBMITTED
+  UNDER_REVIEW
+  MORE_INFO_REQUIRED
+  REJECTED
+  APPROVED
+  EXPIRED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  NOT_DUE
+  PENDING
+  PAID
+  WAIVED
+}
+
+enum SubmissionOutcome {
+  PENDING
+  APPROVED
+  REJECTED
+  MORE_INFO
+}
+
+enum ScheduleStatus {
+  PROPOSED
+  CONFIRMED
+  RESCHEDULED
+  COMPLETED
+  CANCELLED
+}
+
+enum ProductionStatus {
+  PLANNED
+  IN_PROGRESS
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
+enum InstallationStatus {
+  SCHEDULED
+  IN_PROGRESS
+  PARTIAL
+  BLOCKED
+  COMPLETED
+  CANCELLED
+}
+
+model AuthorityType {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  code        String   @unique @db.VarChar(20)
+  name        String   @db.VarChar(100)
+  description String?  @db.VarChar(500)
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  applications AuthorityApplication[]
+
+  @@map("authority_types")
+}
+
+/// One application per authority per job; resubmissions are kept as submissions.
+model AuthorityApplication {
+  id                   String          @id @default(uuid(7)) @db.Uuid
+  jobId                String          @map("job_id") @db.Uuid
+  authorityTypeId      String          @map("authority_type_id") @db.Uuid
+  status               AuthorityStatus @default(PENDING_PREPARATION)
+  referenceNumber      String?         @map("reference_number") @db.VarChar(100)
+  submissionDate       DateTime?       @map("submission_date") @db.Timestamptz(3)
+  expectedResponseDate DateTime?       @map("expected_response_date") @db.Date
+  actualResponseDate   DateTime?       @map("actual_response_date") @db.Timestamptz(3)
+  validUntil           DateTime?       @map("valid_until") @db.Date
+  fees                 Decimal?        @db.Decimal(12, 2)
+  paymentStatus        PaymentStatus   @default(NOT_DUE) @map("payment_status")
+  rejectionReason      String?         @map("rejection_reason") @db.VarChar(2000)
+  notRequiredReason    String?         @map("not_required_reason") @db.VarChar(1000)
+  notRequiredById      String?         @map("not_required_by_id") @db.Uuid
+  comments             String?         @db.VarChar(2000)
+  createdById          String?         @map("created_by_id") @db.Uuid
+  createdAt            DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt            DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  job           Job                      @relation(fields: [jobId], references: [id], onDelete: Restrict)
+  authorityType AuthorityType            @relation(fields: [authorityTypeId], references: [id], onDelete: Restrict)
+  submissions   AuthoritySubmission[]
+  documents     AuthorityDocument[]
+  payments      AuthorityPayment[]
+  history       AuthorityStatusHistory[]
+
+  @@unique([jobId, authorityTypeId])
+  @@index([status])
+  @@map("authority_applications")
+}
+
+model AuthoritySubmission {
+  id              String            @id @default(uuid(7)) @db.Uuid
+  applicationId   String            @map("application_id") @db.Uuid
+  submissionNo    Int               @map("submission_no")
+  submittedAt     DateTime          @map("submitted_at") @db.Timestamptz(3)
+  referenceNumber String?           @map("reference_number") @db.VarChar(100)
+  outcome         SubmissionOutcome @default(PENDING)
+  outcomeAt       DateTime?         @map("outcome_at") @db.Timestamptz(3)
+  outcomeNotes    String?           @map("outcome_notes") @db.VarChar(2000)
+  createdById     String?           @map("created_by_id") @db.Uuid
+  createdAt       DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  application AuthorityApplication @relation(fields: [applicationId], references: [id], onDelete: Restrict)
+
+  @@unique([applicationId, submissionNo])
+  @@map("authority_submissions")
+}
+
+model AuthorityDocument {
+  id            String   @id @default(uuid(7)) @db.Uuid
+  applicationId String   @map("application_id") @db.Uuid
+  fileId        String   @map("file_id") @db.Uuid
+  kind          String   @db.VarChar(20)
+  uploadedById  String?  @map("uploaded_by_id") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  application AuthorityApplication @relation(fields: [applicationId], references: [id], onDelete: Restrict)
+  file        File                 @relation("AuthorityFile", fields: [fileId], references: [id], onDelete: Restrict)
+
+  @@unique([applicationId, fileId])
+  @@map("authority_documents")
+}
+
+model AuthorityPayment {
+  id            String   @id @default(uuid(7)) @db.Uuid
+  applicationId String   @map("application_id") @db.Uuid
+  amount        Decimal  @db.Decimal(12, 2)
+  paidAt        DateTime @map("paid_at") @db.Timestamptz(3)
+  reference     String?  @db.VarChar(100)
+  receiptFileId String?  @map("receipt_file_id") @db.Uuid
+  recordedById  String?  @map("recorded_by_id") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  application AuthorityApplication @relation(fields: [applicationId], references: [id], onDelete: Restrict)
+
+  @@map("authority_payments")
+}
+
+model AuthorityStatusHistory {
+  id            String           @id @default(uuid(7)) @db.Uuid
+  applicationId String           @map("application_id") @db.Uuid
+  fromStatus    AuthorityStatus? @map("from_status")
+  toStatus      AuthorityStatus  @map("to_status")
+  actorId       String?          @map("actor_id") @db.Uuid
+  note          String?          @db.VarChar(2000)
+  createdAt     DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  application AuthorityApplication @relation(fields: [applicationId], references: [id], onDelete: Restrict)
+
+  @@index([applicationId])
+  @@map("authority_status_history")
+}
+
+model VehicleSchedule {
+  id               String         @id @default(uuid(7)) @db.Uuid
+  jobId            String         @map("job_id") @db.Uuid
+  vehicleRef       String         @map("vehicle_ref") @db.VarChar(200)
+  plannedStart     DateTime       @map("planned_start") @db.Timestamptz(3)
+  plannedEnd       DateTime?      @map("planned_end") @db.Timestamptz(3)
+  location         String         @db.VarChar(300)
+  notes            String?        @db.VarChar(2000)
+  status           ScheduleStatus @default(PROPOSED)
+  confirmationNote String?        @map("confirmation_note") @db.VarChar(500)
+  confirmedById    String?        @map("confirmed_by_id") @db.Uuid
+  confirmedAt      DateTime?      @map("confirmed_at") @db.Timestamptz(3)
+  createdById      String?        @map("created_by_id") @db.Uuid
+  createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  job     Job                      @relation(fields: [jobId], references: [id], onDelete: Restrict)
+  history VehicleScheduleHistory[]
+
+  @@index([jobId])
+  @@index([plannedStart])
+  @@map("vehicle_schedules")
+}
+
+model VehicleScheduleHistory {
+  id         String   @id @default(uuid(7)) @db.Uuid
+  scheduleId String   @map("schedule_id") @db.Uuid
+  action     String   @db.VarChar(30)
+  snapshot   Json
+  actorId    String?  @map("actor_id") @db.Uuid
+  reason     String?  @db.VarChar(1000)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  schedule VehicleSchedule @relation(fields: [scheduleId], references: [id], onDelete: Restrict)
+
+  @@index([scheduleId])
+  @@map("vehicle_schedule_history")
+}
+
+model Machine {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  code      String   @unique @db.VarChar(30)
+  name      String   @db.VarChar(100)
+  kind      String?  @db.VarChar(50)
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  orders ProductionOrder[]
+
+  @@map("machines")
+}
+
+model ProductionOrder {
+  id               String           @id @default(uuid(7)) @db.Uuid
+  jobId            String           @map("job_id") @db.Uuid
+  stageId          String           @map("stage_id") @db.Uuid
+  title            String           @db.VarChar(200)
+  activity         String           @default("PRINTING") @db.VarChar(30)
+  artworkVersionId String?          @map("artwork_version_id") @db.Uuid
+  material         String?          @db.VarChar(200)
+  quantity         Int?
+  dimensions       String?          @db.VarChar(200)
+  machineId        String?          @map("machine_id") @db.Uuid
+  operatorId       String?          @map("operator_id") @db.Uuid
+  plannedStart     DateTime?        @map("planned_start") @db.Timestamptz(3)
+  plannedFinish    DateTime?        @map("planned_finish") @db.Timestamptz(3)
+  actualStart      DateTime?        @map("actual_start") @db.Timestamptz(3)
+  actualFinish     DateTime?        @map("actual_finish") @db.Timestamptz(3)
+  status           ProductionStatus @default(PLANNED)
+  wastageNotes     String?          @map("wastage_notes") @db.VarChar(2000)
+  notes            String?          @db.VarChar(2000)
+  createdById      String?          @map("created_by_id") @db.Uuid
+  createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  job      Job             @relation(fields: [jobId], references: [id], onDelete: Restrict)
+  stage    DepartmentStage @relation(fields: [stageId], references: [id], onDelete: Restrict)
+  machine  Machine?        @relation(fields: [machineId], references: [id], onDelete: Restrict)
+  operator User?           @relation("ProductionOperator", fields: [operatorId], references: [id], onDelete: Restrict)
+  logs     OperationLog[]  @relation("ProductionLogs")
+
+  @@index([jobId])
+  @@index([stageId])
+  @@index([status])
+  @@map("production_orders")
+}
+
+model InstallationOrder {
+  id             String             @id @default(uuid(7)) @db.Uuid
+  jobId          String             @map("job_id") @db.Uuid
+  stageId        String             @map("stage_id") @db.Uuid
+  target         String             @db.VarChar(300)
+  address        String?            @db.VarChar(500)
+  accessNotes    String?            @map("access_notes") @db.VarChar(2000)
+  safetyNotes    String?            @map("safety_notes") @db.VarChar(2000)
+  instructions   String?            @db.VarChar(5000)
+  scheduledStart DateTime?          @map("scheduled_start") @db.Timestamptz(3)
+  scheduledEnd   DateTime?          @map("scheduled_end") @db.Timestamptz(3)
+  startedAt      DateTime?          @map("started_at") @db.Timestamptz(3)
+  finishedAt     DateTime?          @map("finished_at") @db.Timestamptz(3)
+  teamLeaderId   String?            @map("team_leader_id") @db.Uuid
+  status         InstallationStatus @default(SCHEDULED)
+  issues         String?            @db.VarChar(5000)
+  createdById    String?            @map("created_by_id") @db.Uuid
+  createdAt      DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  job         Job                      @relation(fields: [jobId], references: [id], onDelete: Restrict)
+  stage       DepartmentStage          @relation(fields: [stageId], references: [id], onDelete: Restrict)
+  teamLeader  User?                    @relation("InstallationLeader", fields: [teamLeaderId], references: [id], onDelete: Restrict)
+  assignments InstallationAssignment[]
+  materials   InstallationMaterial[]
+  logs        OperationLog[]           @relation("InstallationLogs")
+
+  @@index([jobId])
+  @@index([stageId])
+  @@index([scheduledStart])
+  @@map("installation_orders")
+}
+
+model InstallationAssignment {
+  orderId   String   @map("order_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  order InstallationOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  user  User              @relation("InstallationTechnician", fields: [userId], references: [id], onDelete: Restrict)
+
+  @@id([orderId, userId])
+  @@map("installation_assignments")
+}
+
+model InstallationMaterial {
+  id       String  @id @default(uuid(7)) @db.Uuid
+  orderId  String  @map("order_id") @db.Uuid
+  item     String  @db.VarChar(200)
+  quantity Decimal @db.Decimal(12, 2)
+  unit     String? @db.VarChar(20)
+
+  order InstallationOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  @@map("installation_materials")
+}
+
+/// Progress and completion logs for production and installation (append-only).
+model OperationLog {
+  id                  String   @id @default(uuid(7)) @db.Uuid
+  productionOrderId   String?  @map("production_order_id") @db.Uuid
+  installationOrderId String?  @map("installation_order_id") @db.Uuid
+  note                String   @db.VarChar(2000)
+  quantityDone        Int?     @map("quantity_done")
+  status              String?  @db.VarChar(30)
+  fileIds             String[] @map("file_ids") @db.Uuid
+  actorId             String?  @map("actor_id") @db.Uuid
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  productionOrder   ProductionOrder?   @relation("ProductionLogs", fields: [productionOrderId], references: [id], onDelete: Restrict)
+  installationOrder InstallationOrder? @relation("InstallationLogs", fields: [installationOrderId], references: [id], onDelete: Restrict)
+
+  @@index([productionOrderId])
+  @@index([installationOrderId])
+  @@map("operation_logs")
 }

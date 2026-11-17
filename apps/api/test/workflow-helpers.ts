@@ -99,12 +99,68 @@ export class Actors {
     return versionId;
   }
 
+  async upload(user: string, jobId: string, kind: 'authority' | 'production' | 'installation' | 'schedule', name = 'evidence.pdf'): Promise<string> {
+    const s = await this.as(user);
+    const r = await s.agent.post(`${API}/jobs/${jobId}/operation-files?kind=${kind}`).set('X-CSRF-Token', s.csrf).attach('file', PDF, name);
+    if (r.status !== 201) throw new Error(`upload failed ${r.status} ${JSON.stringify(r.body)}`);
+    return r.body.id;
+  }
+
+  /** PRO Leader opens an RTA application and marks it Not Required (fast path). */
+  async clearAuthorities(jobId: string): Promise<void> {
+    const types = (await this.get('demo.pro.lead', '/authority-types')).body as { id: string; code: string }[];
+    const rta = types.find((t) => t.code === 'RTA')!;
+    let auth = (await this.get('demo.pro.lead', `/jobs/${jobId}/authority`)).body;
+    if (!auth.applications.length) auth = (await this.post('demo.pro.lead', `/jobs/${jobId}/authority-applications`, { authorityTypeId: rta.id })).body;
+    for (const a of auth.applications) {
+      if (a.status !== 'APPROVED' && a.status !== 'NOT_REQUIRED') {
+        const r = await this.post('demo.pro.lead', `/authority-applications/${a.id}/not-required`, { reason: 'No livery permit needed for this vehicle class' });
+        if (r.status !== 200) throw new Error(`not required failed ${r.status} ${JSON.stringify(r.body)}`);
+      }
+    }
+  }
+
+  async confirmSchedule(jobId: string): Promise<void> {
+    const r = await this.post('demo.logistic.lead', `/jobs/${jobId}/vehicle-schedules`, { vehicleRef: 'All vehicles', plannedStart: new Date(Date.now() + 86_400_000).toISOString(), location: 'Workshop bay 2' });
+    if (r.status !== 201) throw new Error(`schedule failed ${r.status} ${JSON.stringify(r.body)}`);
+    const id = r.body.schedules.at(-1).id;
+    const c = await this.patch('demo.logistic.lead', `/vehicle-schedules/${id}`, { status: 'CONFIRMED', confirmationNote: 'Customer fleet manager confirmed by phone' });
+    if (c.status !== 200) throw new Error(`confirm failed ${c.status} ${JSON.stringify(c.body)}`);
+  }
+
+  async completeProduction(jobId: string, stageId: string): Promise<void> {
+    const lead = 'demo.production.lead';
+    const r = await this.post(lead, `/jobs/${jobId}/production-orders`, { stageId, title: 'Print and laminate', material: 'Cast vinyl', quantity: 2 });
+    if (r.status !== 201) throw new Error(`production failed ${r.status} ${JSON.stringify(r.body)}`);
+    const order = r.body.productionOrders.filter((o: { stage: { id: string } }) => o.stage.id === stageId).at(-1);
+    const fileId = await this.upload(lead, jobId, 'production', 'print-done.pdf');
+    await this.post(lead, `/production-orders/${order.id}/logs`, { note: 'Printed and laminated', quantityDone: 2, fileIds: [fileId] });
+    const c = await this.patch(lead, `/production-orders/${order.id}`, { status: 'COMPLETED' });
+    if (c.status !== 200) throw new Error(`production complete failed ${c.status} ${JSON.stringify(c.body)}`);
+  }
+
+  async completeInstallation(jobId: string, stageId: string): Promise<void> {
+    const lead = 'demo.installation.lead';
+    const r = await this.post(lead, `/jobs/${jobId}/installation-orders`, { stageId, target: 'All vehicles / site', scheduledStart: new Date().toISOString() });
+    if (r.status !== 201) throw new Error(`installation failed ${r.status} ${JSON.stringify(r.body)}`);
+    const order = r.body.installationOrders.filter((o: { stage: { id: string } }) => o.stage.id === stageId).at(-1);
+    const fileId = await this.upload(lead, jobId, 'installation', 'installed.pdf');
+    await this.post(lead, `/installation-orders/${order.id}/logs`, { note: 'Installed, photos attached', fileIds: [fileId] });
+    const c = await this.patch(lead, `/installation-orders/${order.id}`, { status: 'COMPLETED' });
+    if (c.status !== 200) throw new Error(`installation complete failed ${c.status} ${JSON.stringify(c.body)}`);
+  }
+
   /** Ticks every checklist item of the current stage and completes it as the department leader. */
   async completeCurrent(jobId: string): Promise<WorkflowDto> {
     const wf = await this.workflow(jobId);
     const stage = this.current(wf);
     const leader = LEADER[stage.department.code]!;
-    if (stage.gates.some((g) => g.key === 'design.customer_approval' && !g.passed)) await this.approveArtwork(jobId);
+    const failing = (key: string) => stage.gates.some((g) => g.key === key && !g.passed);
+    if (failing('design.customer_approval')) await this.approveArtwork(jobId);
+    if (failing('authority.all_cleared')) await this.clearAuthorities(jobId);
+    if (failing('logistics.schedule_confirmed')) await this.confirmSchedule(jobId);
+    if (failing('production.completed')) await this.completeProduction(jobId, stage.id);
+    if (failing('installation.completed')) await this.completeInstallation(jobId, stage.id);
     for (const item of stage.checklist.filter((c) => !c.checkedAt)) {
       const r = await this.post(leader, `/jobs/${jobId}/stages/${stage.id}/checklist/${item.id}`, { checked: true });
       if (r.status !== 200) throw new Error(`check failed ${r.status} ${JSON.stringify(r.body)}`);

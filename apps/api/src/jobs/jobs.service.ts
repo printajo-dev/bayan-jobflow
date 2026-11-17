@@ -119,7 +119,7 @@ export class JobsService {
         workflow: {
           include: {
             ...summaryInclude.workflow.include,
-            templateVersion: { include: { template: true, stages: { select: { departmentId: true, sequence: true } } } },
+            templateVersion: { include: { template: true, stages: { select: { departmentId: true, sequence: true, key: true } } } },
           },
         },
         files: {
@@ -147,6 +147,7 @@ export class JobsService {
         templateName: job.workflow.templateVersion.template.name,
         versionNo: job.workflow.templateVersion.versionNo,
       },
+      stageKeys: [...job.workflow.templateVersion.stages].sort((a, b) => a.sequence - b.sequence).map((s) => s.key),
       files: job.files.map((f) => ({
         id: f.file.id,
         originalName: f.file.originalName,

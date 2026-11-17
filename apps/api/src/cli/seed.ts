@@ -44,6 +44,15 @@ export async function seedReferenceData(prisma: PrismaClient): Promise<void> {
     });
   }
 
+  for (const t of [
+    { code: 'RTA', name: 'RTA (Roads and Transport Authority)', description: 'Vehicle advertising permits' },
+    { code: 'DM', name: 'Dubai Municipality', description: 'Outdoor signage permits' },
+    { code: 'TRAKHEES', name: 'Trakhees', description: 'Permits within Trakhees jurisdiction' },
+    { code: 'CIVIL_DEFENCE', name: 'Civil Defence', description: 'Safety approvals for illuminated signage' },
+  ]) {
+    await prisma.authorityType.upsert({ where: { code: t.code }, create: t, update: {} });
+  }
+
   await seedWorkflows(prisma);
   await applyUpgrades(prisma, undefined, (m) => console.log(m));
 }

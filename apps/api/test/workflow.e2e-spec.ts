@@ -111,16 +111,15 @@ describe('Jobs and workflow engine (Phase 2 acceptance)', () => {
       expect(as.current(wf)).toMatchObject({ key: 'government_approval', department: { code: 'PRO' } });
     });
 
-    it('department employees can tick the checklist but only leaders complete the stage', async () => {
+    it('only the department leader can complete the stage', async () => {
       const job = await as.createJob('VB', COMPLETE_VB_BRIEF);
       await as.completeCurrent(job.id);
       const wf = await as.completeCurrent(job.id);
       const gov = as.current(wf);
       expect(gov.key).toBe('government_approval');
-      const tick = await as.post('demo.pro', `/jobs/${job.id}/stages/${gov.id}/checklist/${gov.checklist[0]!.id}`, { checked: true });
-      expect(tick.status).toBe(200);
-      const done = await as.post('demo.pro', `/jobs/${job.id}/stages/${gov.id}/complete`);
-      expect(done.status).toBe(403);
+      expect((await as.post('demo.pro', `/jobs/${job.id}/stages/${gov.id}/complete`)).status).toBe(403);
+      // The leader is allowed, but the stage's checks still have to pass.
+      expect((await as.post('demo.pro.lead', `/jobs/${job.id}/stages/${gov.id}/complete`)).status).toBe(422);
     });
 
     it('blocks completion until gates pass and explains why', async () => {

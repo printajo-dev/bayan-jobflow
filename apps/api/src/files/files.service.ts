@@ -57,7 +57,7 @@ const INLINE_TYPES = new Set(['application/pdf', 'image/png', 'image/jpeg', 'ima
 /** Generous upper bound for a voice note: 256 kbit/s for the maximum duration. */
 const MAX_VOICE_BYTES = MAX_VOICE_SECONDS * 32 * 1024;
 
-export type FilePurpose = 'BRIEF' | 'ARTWORK' | 'APPROVAL_EVIDENCE' | 'ROUND' | 'DISCUSSION' | 'VOICE' | 'CORRECTION' | 'OPERATIONS';
+export type FilePurpose = 'BRIEF' | 'ARTWORK' | 'APPROVAL_EVIDENCE' | 'ROUND' | 'DISCUSSION' | 'VOICE' | 'CORRECTION' | 'OPERATIONS' | 'AUTHORITY' | 'QC' | 'DELIVERY';
 
 export interface StoredUpload {
   path: string;
@@ -229,6 +229,8 @@ export class FilesService {
         }
       } else if (link.purpose === 'ARTWORK' || link.purpose === 'ROUND' || link.purpose === 'APPROVAL_EVIDENCE') {
         allowed = p.has('artwork.view') || p.has('customer_approval.record');
+      } else if (link.purpose === 'AUTHORITY') {
+        allowed = p.has('authority.view');
       } else {
         allowed = true;
       }

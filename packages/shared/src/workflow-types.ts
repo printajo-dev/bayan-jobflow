@@ -48,6 +48,8 @@ export interface JobDetailDto extends JobSummaryDto {
   /** Missing items that block the brief.complete gate (empty when complete). */
   briefProblems: string[];
   templateVersion: { id: string; templateName: string; versionNo: number };
+  /** Stage keys of the job's workflow (decides which tabs are relevant). */
+  stageKeys: string[];
   files: JobFileDto[];
   allowedActions: JobAction[];
 }

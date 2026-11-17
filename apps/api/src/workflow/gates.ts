@@ -68,6 +68,42 @@ export class GateRegistry {
         return latest._count.approvals > 0 ? { passed: true } : { passed: false, detail: `Artwork version ${latest.versionNo} has no recorded customer approval` };
       },
     ],
+    [
+      'authority.all_cleared',
+      async ({ tx, jobId }) => {
+        const apps = await tx.authorityApplication.findMany({ where: { jobId, status: { not: 'CANCELLED' } }, include: { authorityType: true } });
+        if (!apps.length) return { passed: false, detail: 'Add the required authority applications (e.g. RTA), or mark them Not Required' };
+        const open = apps.filter((a) => a.status !== 'APPROVED' && a.status !== 'NOT_REQUIRED');
+        return open.length ? { passed: false, detail: open.map((a) => `${a.authorityType.name}: ${a.status.toLowerCase().replace(/_/g, ' ')}`).join('; ') } : { passed: true };
+      },
+    ],
+    [
+      'logistics.schedule_confirmed',
+      async ({ tx, jobId }) => {
+        const all = await tx.vehicleSchedule.findMany({ where: { jobId, status: { not: 'CANCELLED' } } });
+        if (!all.some((s) => s.status === 'CONFIRMED' || s.status === 'COMPLETED')) return { passed: false, detail: 'No vehicle schedule with confirmed availability' };
+        const pending = all.filter((s) => s.status === 'PROPOSED' || s.status === 'RESCHEDULED');
+        return pending.length ? { passed: false, detail: `${pending.length} schedule(s) still waiting for confirmation` } : { passed: true };
+      },
+    ],
+    [
+      'production.completed',
+      async ({ tx, stageId }) => {
+        const orders = await tx.productionOrder.findMany({ where: { stageId, status: { not: 'CANCELLED' } } });
+        if (!orders.length) return { passed: false, detail: 'No production order recorded for this stage' };
+        const open = orders.filter((o) => o.status !== 'COMPLETED');
+        return open.length ? { passed: false, detail: `Not finished: ${open.map((o) => o.title).join(', ')}` } : { passed: true };
+      },
+    ],
+    [
+      'installation.completed',
+      async ({ tx, stageId }) => {
+        const orders = await tx.installationOrder.findMany({ where: { stageId, status: { not: 'CANCELLED' } } });
+        if (!orders.length) return { passed: false, detail: 'No installation recorded for this stage' };
+        const open = orders.filter((o) => o.status !== 'COMPLETED');
+        return open.length ? { passed: false, detail: `Not finished: ${open.map((o) => o.target).join(', ')}` } : { passed: true };
+      },
+    ],
   ]);
 
   async evaluate(gateKeys: string[], ctx: GateContext): Promise<GateResultDto[]> {

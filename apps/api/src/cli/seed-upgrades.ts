@@ -45,6 +45,25 @@ function phase3(def: TemplateDef): TemplateDef {
   };
 }
 
+/** Phase 4: PRO, vehicle schedule, production and installation records replace interim ticks. */
+function phase4(def: TemplateDef): TemplateDef {
+  const swap: Record<string, { gate: GateKey; drop: string[] }> = {
+    government_approval: { gate: 'authority.all_cleared', drop: ['Every required authority approval is Approved or marked Not Required with a reason'] },
+    vehicle_schedule: { gate: 'logistics.schedule_confirmed', drop: ['Vehicle availability confirmed', 'Schedule date and location confirmed'] },
+    print: { gate: 'production.completed', drop: ['Approved artwork version printed', 'Production details recorded (material, machine, quantity)'] },
+    production: { gate: 'production.completed', drop: ['Fabrication / printing / assembly completed', 'Production completion evidence recorded'] },
+    wrap: { gate: 'installation.completed', drop: ['Vehicle branding installed', 'Installation team and completion photos recorded'] },
+    installation: { gate: 'installation.completed', drop: ['Installation completed on site', 'Site completion evidence recorded'] },
+  };
+  return {
+    ...def,
+    stages: def.stages.map((s) => {
+      const rule = swap[s.key];
+      return rule ? dropChecklist(addGates(s, [rule.gate]), rule.drop) : s;
+    }),
+  };
+}
+
 /**
  * Changes that later releases make to seeded data. Each runs once (tracked in
  * system_settings). Template upgrades publish a new version only when the
@@ -85,6 +104,25 @@ async function backfillChannels(prisma: PrismaClient): Promise<void> {
 }
 
 UPGRADES.push({ id: '2026-11-p3-backfill-channels', kind: 'run', description: 'create discussion channels for existing jobs', run: backfillChannels });
+
+UPGRADES.push(
+  {
+    id: '2026-11-p4-vb-template',
+    kind: 'template',
+    template: 'VB',
+    fromVersionNo: 2,
+    notes: 'Phase 4: authority approvals, confirmed vehicle schedule, production and installation records are checked automatically.',
+    transform: (d) => phase4(d),
+  },
+  {
+    id: '2026-11-p4-sg-template',
+    kind: 'template',
+    template: 'SG',
+    fromVersionNo: 2,
+    notes: 'Phase 4: production and installation records are checked automatically.',
+    transform: (d) => phase4(d),
+  },
+);
 
 const KEY = 'seed.upgrades';
 
