@@ -18,6 +18,13 @@ import { UsersController } from './users/users.controller.js';
 import { DepartmentsController, DepartmentsService } from './departments/departments.js';
 import { PermissionsController, RolesController, RolesService } from './roles/roles.js';
 import { HealthController } from './health/health.controller.js';
+import { GateRegistry } from './workflow/gates.js';
+import { WorkflowEngine } from './workflow/engine.service.js';
+import { TemplatesController, TemplatesService } from './workflow/templates.js';
+import { SettingsController, SettingsService } from './settings/settings.js';
+import { JobsService } from './jobs/jobs.service.js';
+import { FilesController, JobsController } from './jobs/jobs.controller.js';
+import { FilesService } from './files/files.service.js';
 
 /**
  * Phase 1 wires every module into one Nest module; the services keep their
@@ -34,6 +41,10 @@ import { HealthController } from './health/health.controller.js';
     RolesController,
     PermissionsController,
     AuditController,
+    TemplatesController,
+    SettingsController,
+    JobsController,
+    FilesController,
   ],
   providers: [
     AuditService,
@@ -44,6 +55,12 @@ import { HealthController } from './health/health.controller.js';
     UsersService,
     DepartmentsService,
     RolesService,
+    GateRegistry,
+    WorkflowEngine,
+    TemplatesService,
+    SettingsService,
+    JobsService,
+    FilesService,
     { provide: APP_GUARD, useClass: AuthGuard },
     { provide: APP_FILTER, useClass: HttpExceptionFilter },
   ],

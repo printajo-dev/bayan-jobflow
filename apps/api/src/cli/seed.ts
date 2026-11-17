@@ -4,6 +4,7 @@ import type { PrismaClient } from '../generated/prisma/client.js';
 import { createPrismaClient } from '../core/prisma.service.js';
 import { hashPassword } from '../auth/password.js';
 import { SEED_ROLES } from './seed-data.js';
+import { seedWorkflows } from './seed-workflows.js';
 
 /**
  * Reference data. Safe to run on every deploy:
@@ -41,6 +42,8 @@ export async function seedReferenceData(prisma: PrismaClient): Promise<void> {
       },
     });
   }
+
+  await seedWorkflows(prisma);
 }
 
 export const DEMO_PASSWORD = 'Demo-Password-2026';
@@ -82,7 +85,7 @@ if (isMain) {
   const prisma = createPrismaClient();
   try {
     await seedReferenceData(prisma);
-    console.log('Reference data seeded (permissions, departments, roles).');
+    console.log('Reference data seeded (permissions, departments, roles, service types, workflow templates).');
     if (process.argv.includes('--demo')) {
       await seedDemoUsers(prisma);
       console.log(`Demo users seeded. Password for all demo users: ${DEMO_PASSWORD}`);

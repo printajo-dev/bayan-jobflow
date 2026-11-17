@@ -105,10 +105,7 @@ export const updateDepartmentSchema = z.strictObject({
 export const ROLE_SCOPES = ['GLOBAL', 'DEPARTMENT'] as const;
 export type RoleScope = (typeof ROLE_SCOPES)[number];
 
-const permissionKeySchema = z.custom<PermissionKey>(
-  (v) => typeof v === 'string' && (PERMISSION_KEYS as readonly string[]).includes(v),
-  'Unknown permission',
-);
+const permissionKeySchema = z.enum(PERMISSION_KEYS as [PermissionKey, ...PermissionKey[]], { message: 'Unknown permission' });
 
 export const createRoleSchema = z.strictObject({
   key: z

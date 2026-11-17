@@ -21,6 +21,11 @@ const envSchema = z.object({
   LOG_LEVEL: z.enum(['error', 'warn', 'log', 'debug', 'verbose']).default('log'),
   OUTBOX_POLL_MS: z.coerce.number().int().min(100).default(1000),
   OUTBOX_MAX_ATTEMPTS: z.coerce.number().int().min(1).default(8),
+  /** Root folder for uploaded files (bind-mounted from /srv/company-data/files). */
+  FILES_ROOT: z.string().min(1).default('./data/files'),
+  UPLOAD_MAX_MB: z.coerce.number().int().min(1).max(4096).default(200),
+  /** Serve Swagger UI at /api/v1/docs. Off in production unless an admin enables it. */
+  API_DOCS: bool.default(false),
 });
 
 export type AppConfig = z.infer<typeof envSchema>;

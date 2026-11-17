@@ -18,6 +18,8 @@ export default defineConfig({
       TRUST_PROXY: 'false',
       LOGIN_RATE_PER_MINUTE: '1000',
       LOG_LEVEL: 'error',
+      FILES_ROOT: './.e2e-files',
+      UPLOAD_MAX_MB: '2',
     },
   },
 });

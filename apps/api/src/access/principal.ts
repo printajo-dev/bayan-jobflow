@@ -45,6 +45,11 @@ export class Principal {
     );
   }
 
+  /** Departments in which this permission applies (excluding global grants). */
+  departmentsWith(permission: PermissionKey): string[] {
+    return [...this.departmentPermissions.entries()].filter(([, set]) => set.has(permission)).map(([id]) => id);
+  }
+
   isMemberOf(departmentId: string): boolean {
     return this.departments.some((d) => d.id === departmentId);
   }
