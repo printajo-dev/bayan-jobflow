@@ -1,5 +1,27 @@
 # Changelog
 
+## Phase 5 — QC, rework, delivery and closure (unreleased)
+
+Built
+- Versioned QC checklists per service type (seeded for Vehicle Branding and
+  Signage; edited in Settings — inspections keep their own copy).
+- QC inspections by the Quality Team: Pass / Fail / N/A per item, comments,
+  evidence photos (required where the checklist says so); submitted inspections
+  can never be changed (database trigger) and every re-inspection is a new record.
+- Passing completes the QC stage immediately: Signage closes, Vehicle Branding
+  moves to Delivery (`quality.passed`).
+- Failing records the defects, raises a blocking correction for the responsible
+  department (optionally assigned), returns the job to that stage only, notifies
+  the department and keeps Delivery locked until a later inspection passes.
+- Delivery (Vehicle Branding only, Logistic): plan, then record the handover with
+  recipient, notes and evidence; this completes the Delivery stage and closes the
+  job (`logistics.delivery_completed`).
+- Web: QC tab (inspection form with photos, pass, fail with rework target) and
+  Delivery tab; QC checklist editor in Settings.
+- All interim checklist ticks from earlier phases are now replaced by real
+  records; template upgrades publish the final checks.
+
+
 ## Phase 4 — PRO approvals, vehicle schedule, production, installation (unreleased)
 
 Built

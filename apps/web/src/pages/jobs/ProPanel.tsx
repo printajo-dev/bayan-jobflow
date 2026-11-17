@@ -52,7 +52,7 @@ export function ProPanel({ jobId }: { jobId: string }) {
   return (
     <Stack>
       <Group justify="space-between">
-        <Text size="sm">
+        <Text size="sm" component="div">
           Government approval is{' '}
           {d.cleared ? <Badge color="green">cleared</Badge> : <Badge color="orange">not cleared</Badge>} — Print and Wrap cannot start until every required authority is Approved or
           marked Not Required.

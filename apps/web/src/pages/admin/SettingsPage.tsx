@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Alert, Button, Card, Group, Stack, Text, TextInput, Title } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import type { AuthorityTypeDto, JobNumberSettings, MachineDto } from '@jobflow/shared';
-import { Badge, Switch, Table } from '@mantine/core';
+import type { AuthorityTypeDto, JobNumberSettings, MachineDto, QcTemplateDto } from '@jobflow/shared';
+import { Badge, Checkbox, Select, Switch, Table, Textarea } from '@mantine/core';
 import { get, patch, post, put } from '../../api/client';
 import { ErrorState, errorMessage, LoadingState } from '../../components/states';
 
@@ -17,6 +17,7 @@ export function SettingsPage() {
       <JobNumberCard initial={settings.data} />
       <AuthorityTypesCard />
       <MachinesCard />
+      <QcChecklistCard />
     </Stack>
   );
 }
@@ -140,6 +141,50 @@ function MachinesCard() {
           <TextInput label="Name" style={{ flex: 1 }} value={name} onChange={(e) => setName(e.currentTarget.value)} />
           <TextInput label="Kind" w={140} value={kind} onChange={(e) => setKind(e.currentTarget.value)} />
           <Button disabled={!code || !name} loading={add.isPending} onClick={() => add.mutate()}>Add</Button>
+        </Group>
+      </Stack>
+    </Card>
+  );
+}
+
+function QcChecklistCard() {
+  const qc = useQueryClient();
+  const templates = useQuery({ queryKey: ['qc-templates'], queryFn: () => get<QcTemplateDto[]>('/qc-checklist-templates') });
+  const [code, setCode] = useState<string>('VB');
+  const current = templates.data?.find((t) => t.serviceType.code === code);
+  const [text, setText] = useState<string | null>(null);
+  const [evidence, setEvidence] = useState<Set<number>>(new Set());
+  const lines = (text ?? current?.items.map((i) => i.label).join('\n') ?? '').split('\n').map((l) => l.trim()).filter(Boolean);
+  const save = useMutation({
+    mutationFn: () =>
+      post(`/qc-checklist-templates/${code}`, {
+        name: current?.name ?? (code === 'VB' ? 'Vehicle branding QC' : 'Signage QC'),
+        items: lines.map((label, i) => ({ label, required: true, requiresEvidence: text === null ? (current?.items[i]?.requiresEvidence ?? false) : evidence.has(i) })),
+      }),
+    onSuccess: () => {
+      setText(null);
+      void qc.invalidateQueries({ queryKey: ['qc-templates'] });
+    },
+  });
+  return (
+    <Card withBorder>
+      <Stack>
+        <Title order={4}>QC checklists</Title>
+        <Text size="sm" c="dimmed">One item per line. Saving creates a new version; inspections already started keep their own copy.</Text>
+        {save.isError && <Alert color="red">{errorMessage(save.error)}</Alert>}
+        <Select label="Service type" data={[{ value: 'VB', label: 'Vehicle Branding' }, { value: 'SG', label: 'Signage' }]} value={code} onChange={(v) => { setCode(v ?? 'VB'); setText(null); }} allowDeselect={false} w={240} />
+        <Text size="xs">Current: {current ? `${current.name} v${current.version}` : 'none'}</Text>
+        <Textarea autosize minRows={5} value={text ?? current?.items.map((i) => i.label).join('\n') ?? ''} onChange={(e) => setText(e.currentTarget.value)} aria-label="Checklist items" />
+        {text !== null && (
+          <Stack gap={2}>
+            <Text size="xs">Photo required for:</Text>
+            {lines.map((l, i) => (
+              <Checkbox key={i} size="xs" label={l} checked={evidence.has(i)} onChange={(e) => { const n = new Set(evidence); if (e.currentTarget.checked) n.add(i); else n.delete(i); setEvidence(n); }} />
+            ))}
+          </Stack>
+        )}
+        <Group justify="flex-end">
+          <Button disabled={text === null || lines.length === 0} loading={save.isPending} onClick={() => save.mutate()}>Save new version</Button>
         </Group>
       </Stack>
     </Card>

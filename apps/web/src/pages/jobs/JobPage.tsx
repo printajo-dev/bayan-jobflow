@@ -41,6 +41,7 @@ import { DiscussionsPanel } from './DiscussionsPanel';
 import { CorrectionsPanel } from './CorrectionsPanel';
 import { ProPanel } from './ProPanel';
 import { OperationsPanel } from './OperationsPanel';
+import { DeliveryPanel, QualityPanel } from './QualityPanel';
 import { EmptyState, ErrorState, errorMessage, LoadingState } from '../../components/states';
 import { COVERAGE, formatDate, formatDateTime, formatSize, JOB_STATUS, PRIORITY } from '../../components/format';
 
@@ -117,6 +118,8 @@ export function JobPage() {
           {canDo('channel.view') && <Tabs.Tab value="discussions">Discussions</Tabs.Tab>}
           {j.stageKeys.includes('government_approval') && canDo('authority.view') && <Tabs.Tab value="pro">PRO approvals</Tabs.Tab>}
           {(canDo('production.view') || canDo('installation.view') || canDo('vehicle_schedule.view')) && <Tabs.Tab value="operations">Operations</Tabs.Tab>}
+          {j.stageKeys.includes('qc_inspection') && canDo('qc.view') && <Tabs.Tab value="qc">QC</Tabs.Tab>}
+          {j.stageKeys.includes('delivery') && <Tabs.Tab value="delivery">Delivery</Tabs.Tab>}
           <Tabs.Tab value="corrections">Corrections</Tabs.Tab>
           <Tabs.Tab value="files">Files ({j.files.length})</Tabs.Tab>
           <Tabs.Tab value="activity">Activity</Tabs.Tab>
@@ -135,6 +138,12 @@ export function JobPage() {
         </Tabs.Panel>
         <Tabs.Panel value="operations" pt="md">
           <OperationsPanel jobId={j.id} showSchedule={j.stageKeys.includes('vehicle_schedule')} />
+        </Tabs.Panel>
+        <Tabs.Panel value="qc" pt="md">
+          <QualityPanel jobId={j.id} />
+        </Tabs.Panel>
+        <Tabs.Panel value="delivery" pt="md">
+          <DeliveryPanel jobId={j.id} />
         </Tabs.Panel>
         <Tabs.Panel value="corrections" pt="md">
           <CorrectionsPanel jobId={j.id} />

@@ -161,8 +161,21 @@ Required.
   logs; completion needs a log with photos. Use *Blocked* or *Partial* with a
   description when work cannot finish.
 
-## Interim checklists (until later phases)
+## QC inspection
 
-Until the QC and delivery screens are released, those stages are completed by
-ticking their checklist items.
-Each later phase replaces these ticks with the real records and checks.
+The Quality Team opens the **QC** tab and presses *Start inspection*. Each
+checklist item is marked Pass, Fail or N/A (N/A on a required item needs a
+comment); items marked "photo required" need a photo.
+
+- *Pass inspection*: the QC stage completes at once. A Signage job closes; a
+  Vehicle Branding job moves to Delivery.
+- *Fail inspection*: describe the defects and choose which stage must redo the
+  work (for example Wrap). JobFlow creates a blocking correction for that
+  department, sends the job back to that stage only, and QC inspects again
+  afterwards. The failed inspection stays in the history.
+
+## Delivery (Vehicle Branding)
+
+Logistic plans the delivery on the **Delivery** tab, and after the handover
+presses *Record handover* with the recipient's name, notes and photos or a
+signed handover note. The job then closes.
