@@ -171,23 +171,65 @@ export class WorkflowEngine {
 
   /** Sends the job back to an earlier stage allowed by the template (e.g. PRO -> Design). */
   returnTo(jobId: string, stageId: string, targetKey: string, reason: string, p: Principal, meta: ActionMeta): Promise<WorkflowDto> {
-    return this.act(jobId, stageId, p, 'return', async (tx, ctx, stage, ts) => {
-      const target = this.returnTargets(ctx, ts.id).find((t) => t.key === targetKey);
-      if (!target) throw new ConflictException(`${ts.name} cannot be returned to "${targetKey}"`);
-      await tx.departmentStage.update({ where: { id: stage.id }, data: { status: 'RETURNED', returnReason: reason } });
-      await this.transition(tx, ctx.workflow.id, stage.id, 'return', 'ACTIVE', 'RETURNED', meta.actorId, reason);
-      const occ = this.nextOccurrenceNo(ctx, target.id);
-      const newId = await this.createOccurrence(tx, ctx.workflow.id, target, occ, 'ACTIVE', { returnedFromStageId: stage.id, returnReason: reason });
-      await this.transition(tx, ctx.workflow.id, newId, 'activate_rework', null, 'ACTIVE', meta.actorId, reason);
-      await this.audit.record(tx, meta, {
-        action: 'workflow.stage_returned',
-        entityType: 'job',
-        entityId: ctx.job.id,
-        summary: `${ts.name} returned the job to ${target.name} (round ${occ}): ${reason}`,
-      });
-      await this.activated(tx, ctx, newId, target, 'workflow.stage.returned', { fromStageId: stage.id, reason });
-      await postSystemMessage(tx, ctx.job.id, target.departmentId, `${ts.name} returned the job for correction (round ${occ}): ${reason}`, newId);
+    return this.act(jobId, stageId, p, 'return', (tx, ctx, stage, ts) => this.doReturn(tx, ctx, stage, ts, targetKey, reason, meta));
+  }
+
+  /**
+   * Used by modules (e.g. a failed QC inspection) that have already checked
+   * their own permission: returns the job from the given active stage to an
+   * allowed earlier stage inside the caller's transaction.
+   */
+  async systemReturn(tx: Tx, jobId: string, stageId: string, targetKey: string, reason: string, meta: ActionMeta): Promise<void> {
+    const ctx = await this.load(tx, jobId, true);
+    const stage = ctx.stages.find((s) => s.id === stageId);
+    if (!stage || stage.status !== 'ACTIVE') throw new ConflictException('The stage is not active');
+    const ts = ctx.templateStages.find((t) => t.id === stage.templateStageId)!;
+    await this.doReturn(tx, ctx, stage, ts, targetKey, reason, meta);
+  }
+
+  /**
+   * Completes the stage if every check passes (used after a QC pass or a
+   * completed delivery, so the job moves on — or closes — immediately).
+   * Returns false and changes nothing when a check is still open.
+   */
+  async systemComplete(tx: Tx, jobId: string, stageId: string, meta: ActionMeta): Promise<boolean> {
+    const ctx = await this.load(tx, jobId, true);
+    const stage = ctx.stages.find((s) => s.id === stageId);
+    if (!stage || stage.status !== 'ACTIVE') return false;
+    const ts = ctx.templateStages.find((t) => t.id === stage.templateStageId)!;
+    const results = await this.evaluate(tx, ctx, stage, ts);
+    if (results.some((r) => !r.passed)) return false;
+    await tx.departmentStage.update({ where: { id: stage.id }, data: { status: 'COMPLETED', completedAt: new Date(), completedById: meta.actorId } });
+    await this.transition(tx, ctx.workflow.id, stage.id, 'complete', 'ACTIVE', 'COMPLETED', meta.actorId, null);
+    await this.audit.record(tx, meta, { action: 'workflow.stage_completed', entityType: 'job', entityId: ctx.job.id, summary: `${ts.name} completed automatically after its records were finished` });
+    await postSystemMessage(tx, ctx.job.id, ts.departmentId, `${ts.name} completed.`, stage.id);
+    await this.outbox.enqueue(tx, {
+      type: 'workflow.stage.completed',
+      aggregateType: 'job',
+      aggregateId: ctx.job.id,
+      payload: { jobId: ctx.job.id, stageId: stage.id, stageKey: ts.key },
+      idempotencyKey: `workflow.stage.completed:${stage.id}`,
     });
+    await this.advance(tx, ctx, stage, ts, meta);
+    return true;
+  }
+
+  private async doReturn(tx: Tx, ctx: WorkflowContext, stage: StageRow, ts: TemplateStageRow, targetKey: string, reason: string, meta: ActionMeta): Promise<void> {
+    const target = this.returnTargets(ctx, ts.id).find((t) => t.key === targetKey);
+    if (!target) throw new ConflictException(`${ts.name} cannot be returned to "${targetKey}"`);
+    await tx.departmentStage.update({ where: { id: stage.id }, data: { status: 'RETURNED', returnReason: reason } });
+    await this.transition(tx, ctx.workflow.id, stage.id, 'return', 'ACTIVE', 'RETURNED', meta.actorId, reason);
+    const occ = this.nextOccurrenceNo(ctx, target.id);
+    const newId = await this.createOccurrence(tx, ctx.workflow.id, target, occ, 'ACTIVE', { returnedFromStageId: stage.id, returnReason: reason });
+    await this.transition(tx, ctx.workflow.id, newId, 'activate_rework', null, 'ACTIVE', meta.actorId, reason);
+    await this.audit.record(tx, meta, {
+      action: 'workflow.stage_returned',
+      entityType: 'job',
+      entityId: ctx.job.id,
+      summary: `${ts.name} returned the job to ${target.name} (round ${occ}): ${reason}`,
+    });
+    await this.activated(tx, ctx, newId, target, 'workflow.stage.returned', { fromStageId: stage.id, reason });
+    await postSystemMessage(tx, ctx.job.id, target.departmentId, `${ts.name} returned the job for correction (round ${occ}): ${reason}`, newId);
   }
 
   /**

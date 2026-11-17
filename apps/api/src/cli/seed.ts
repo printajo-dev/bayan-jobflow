@@ -54,7 +54,50 @@ export async function seedReferenceData(prisma: PrismaClient): Promise<void> {
   }
 
   await seedWorkflows(prisma);
+  await seedQcChecklists(prisma);
   await applyUpgrades(prisma, undefined, (m) => console.log(m));
+}
+
+const QC_CHECKLISTS: Record<'VB' | 'SG', { name: string; items: { label: string; evidence?: boolean }[] }> = {
+  VB: {
+    name: 'Vehicle branding QC',
+    items: [
+      { label: 'Graphics match the approved artwork version' },
+      { label: 'No bubbles, wrinkles or lifting' },
+      { label: 'Edges, seams and cut-outs trimmed and sealed' },
+      { label: 'Colours match the approved proof' },
+      { label: 'Vehicle clean and undamaged' },
+      { label: 'Completion photos of every side', evidence: true },
+    ],
+  },
+  SG: {
+    name: 'Signage QC',
+    items: [
+      { label: 'Dimensions and position match the drawings' },
+      { label: 'Fixings secure and level' },
+      { label: 'Electrical / LED working and safe' },
+      { label: 'Finish free of scratches and defects' },
+      { label: 'Site left clean' },
+      { label: 'Completion photos', evidence: true },
+    ],
+  },
+};
+
+/** Creates the first QC checklist per service type when none exists. */
+async function seedQcChecklists(prisma: PrismaClient): Promise<void> {
+  for (const code of ['VB', 'SG'] as const) {
+    const st = await prisma.serviceType.findUnique({ where: { code } });
+    if (!st || (await prisma.qcChecklistTemplate.count({ where: { serviceTypeId: st.id } }))) continue;
+    const def = QC_CHECKLISTS[code];
+    await prisma.qcChecklistTemplate.create({
+      data: {
+        serviceTypeId: st.id,
+        name: def.name,
+        version: 1,
+        items: { create: def.items.map((i, n) => ({ sequence: n + 1, label: i.label, required: true, requiresEvidence: !!i.evidence })) },
+      },
+    });
+  }
 }
 
 export const DEMO_PASSWORD = 'Demo-Password-2026';

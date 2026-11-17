@@ -150,6 +150,36 @@ export class Actors {
     if (c.status !== 200) throw new Error(`installation complete failed ${c.status} ${JSON.stringify(c.body)}`);
   }
 
+  async passQc(jobId: string, stageId: string, user = 'demo.quality.lead'): Promise<void> {
+    const qc = await this.startQc(jobId, stageId, user);
+    const res = await this.post(user, `/qc-inspections/${qc.id}/approve`);
+    if (res.status !== 200) throw new Error(`qc approve failed ${res.status} ${JSON.stringify(res.body)}`);
+  }
+
+  /** Starts an inspection and records PASS on every item (with a photo where required). */
+  async startQc(jobId: string, stageId: string, user = 'demo.quality.lead'): Promise<{ id: string; results: { itemId: string; requiresEvidence: boolean }[] }> {
+    const started = await this.post(user, `/jobs/${jobId}/qc-inspections`, { stageId });
+    if (started.status !== 201) throw new Error(`qc start failed ${started.status} ${JSON.stringify(started.body)}`);
+    const ins = started.body.inspections[0];
+    const s = await this.as(user);
+    const photo = await s.agent.post(`${API}/jobs/${jobId}/qc-files`).set('X-CSRF-Token', s.csrf).attach('file', PDF, 'qc-photo.pdf');
+    const results = ins.results.map((r: { itemId: string; requiresEvidence: boolean }) => ({ itemId: r.itemId, result: 'PASS', fileIds: r.requiresEvidence ? [photo.body.id] : [] }));
+    const saved = await this.patch(user, `/qc-inspections/${ins.id}/results`, { results });
+    if (saved.status !== 200) throw new Error(`qc results failed ${saved.status} ${JSON.stringify(saved.body)}`);
+    return ins;
+  }
+
+  async deliver(jobId: string, stageId: string): Promise<void> {
+    const lead = 'demo.logistic.lead';
+    const planned = await this.post(lead, `/jobs/${jobId}/delivery-records`, { stageId, plannedAt: new Date().toISOString() });
+    if (planned.status !== 201) throw new Error(`delivery plan failed ${planned.status} ${JSON.stringify(planned.body)}`);
+    const rec = planned.body.deliveries.at(-1);
+    const s = await this.as(lead);
+    const ev = await s.agent.post(`${API}/jobs/${jobId}/delivery-files`).set('X-CSRF-Token', s.csrf).attach('file', PDF, 'handover.pdf');
+    const done = await this.post(lead, `/delivery-records/${rec.id}/complete`, { actualAt: new Date().toISOString(), recipientName: 'Fleet manager', fileIds: [ev.body.id] });
+    if (done.status !== 200) throw new Error(`delivery failed ${done.status} ${JSON.stringify(done.body)}`);
+  }
+
   /** Ticks every checklist item of the current stage and completes it as the department leader. */
   async completeCurrent(jobId: string): Promise<WorkflowDto> {
     const wf = await this.workflow(jobId);
@@ -161,6 +191,11 @@ export class Actors {
     if (failing('logistics.schedule_confirmed')) await this.confirmSchedule(jobId);
     if (failing('production.completed')) await this.completeProduction(jobId, stage.id);
     if (failing('installation.completed')) await this.completeInstallation(jobId, stage.id);
+    if (failing('quality.passed')) await this.passQc(jobId, stage.id);
+    if (failing('logistics.delivery_completed')) await this.deliver(jobId, stage.id);
+    // QC pass and delivery complete their stage automatically.
+    const after = await this.workflow(jobId);
+    if (after.stages.find((x) => x.id === stage.id)?.status !== 'ACTIVE') return after;
     for (const item of stage.checklist.filter((c) => !c.checkedAt)) {
       const r = await this.post(leader, `/jobs/${jobId}/stages/${stage.id}/checklist/${item.id}`, { checked: true });
       if (r.status !== 200) throw new Error(`check failed ${r.status} ${JSON.stringify(r.body)}`);

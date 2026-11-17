@@ -104,6 +104,21 @@ export class GateRegistry {
         return open.length ? { passed: false, detail: `Not finished: ${open.map((o) => o.target).join(', ')}` } : { passed: true };
       },
     ],
+    [
+      'quality.passed',
+      async ({ tx, stageId }) => {
+        const latest = await tx.qcInspection.findFirst({ where: { stageId, status: { not: 'DRAFT' } }, orderBy: { createdAt: 'desc' } });
+        if (!latest) return { passed: false, detail: 'No QC inspection submitted for this round' };
+        return latest.status === 'PASSED' ? { passed: true } : { passed: false, detail: 'The latest inspection failed' };
+      },
+    ],
+    [
+      'logistics.delivery_completed',
+      async ({ tx, stageId }) => {
+        const n = await tx.deliveryRecord.count({ where: { stageId, status: 'COMPLETED' } });
+        return n > 0 ? { passed: true } : { passed: false, detail: 'Delivery and handover not recorded yet' };
+      },
+    ],
   ]);
 
   async evaluate(gateKeys: string[], ctx: GateContext): Promise<GateResultDto[]> {

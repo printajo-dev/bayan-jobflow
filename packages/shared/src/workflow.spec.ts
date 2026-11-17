@@ -30,6 +30,6 @@ describe('workflow schemas', () => {
   it('only allows gates that exist in this phase', () => {
     const stage = { key: 'design', name: 'Design', departmentId: '0197a3c4-0000-7000-8000-000000000001' };
     expect(saveTemplateVersionSchema.safeParse({ stages: [{ ...stage, gateKeys: ['brief.complete'] }] }).success).toBe(true);
-    expect(saveTemplateVersionSchema.safeParse({ stages: [{ ...stage, gateKeys: ['quality.passed'] }] }).success).toBe(false);
+    expect(saveTemplateVersionSchema.safeParse({ stages: [{ ...stage, gateKeys: ['no.such.gate'] }] }).success).toBe(false);
   });
 });

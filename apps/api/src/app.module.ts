@@ -29,7 +29,8 @@ import { RealtimeService } from './realtime/realtime.service.js';
 import { DirectoryController } from './directory.controller.js';
 import { AuthorityService } from './authority/authority.service.js';
 import { OperationsService } from './operations/operations.service.js';
-import { AuthorityController, OperationsController } from './operations.controllers.js';
+import { AuthorityController, OperationsController, QualityController } from './operations.controllers.js';
+import { QualityService } from './quality/quality.service.js';
 import { DiscussionsService } from './discussions/discussions.service.js';
 import { TasksService } from './tasks/tasks.service.js';
 import { DesignService } from './design/design.service.js';
@@ -64,6 +65,7 @@ import { CorrectionsController, DesignController, DiscussionsController, TasksCo
     DirectoryController,
     AuthorityController,
     OperationsController,
+    QualityController,
   ],
   providers: [
     AuditService,
@@ -88,6 +90,7 @@ import { CorrectionsController, DesignController, DiscussionsController, TasksCo
     NotificationsService,
     AuthorityService,
     OperationsService,
+    QualityService,
     { provide: APP_GUARD, useClass: AuthGuard },
     { provide: APP_FILTER, useClass: HttpExceptionFilter },
   ],

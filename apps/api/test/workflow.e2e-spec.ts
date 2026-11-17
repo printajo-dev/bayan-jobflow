@@ -299,7 +299,7 @@ describe('Jobs and workflow engine (Phase 2 acceptance)', () => {
       const futureGate = await admin.agent
         .put(`${API}/workflow-template-versions/${draft.id}`)
         .set('X-CSRF-Token', admin.csrf)
-        .send({ stages: [{ key: 'a', name: 'A', departmentId: dept, gateKeys: ['quality.passed'] }] });
+        .send({ stages: [{ key: 'a', name: 'A', departmentId: dept, gateKeys: ['no.such.gate'] }] });
       expect(futureGate.status).toBe(400);
       await admin.agent.delete(`${API}/workflow-template-versions/${draft.id}`).set('X-CSRF-Token', admin.csrf).expect(204);
       expect((await as.get('demo.sales.lead', '/workflow-templates')).status).toBe(403);

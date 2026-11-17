@@ -290,8 +290,9 @@ model ServiceType {
   isActive  Boolean  @default(true) @map("is_active")
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
 
-  templates WorkflowTemplate[]
-  jobs      Job[]
+  templates   WorkflowTemplate[]
+  jobs        Job[]
+  qcTemplates QcChecklistTemplate[]
 
   @@map("service_types")
 }
@@ -398,21 +399,23 @@ model Job {
   createdAt              DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt              DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  serviceType  ServiceType            @relation(fields: [serviceTypeId], references: [id], onDelete: Restrict)
-  createdBy    User?                  @relation("JobCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
-  brief        JobBrief?
-  workflow     JobWorkflow?
-  files        JobFile[]
-  tasks        Task[]
-  rounds       CorrectionRound[]
-  artwork      ArtworkVersion[]
-  approvals    ApprovalRecord[]
-  channels     DiscussionChannel[]
-  corrections  CorrectionItem[]
-  authority    AuthorityApplication[]
-  schedules    VehicleSchedule[]
-  production   ProductionOrder[]
-  installation InstallationOrder[]
+  serviceType   ServiceType            @relation(fields: [serviceTypeId], references: [id], onDelete: Restrict)
+  createdBy     User?                  @relation("JobCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  brief         JobBrief?
+  workflow      JobWorkflow?
+  files         JobFile[]
+  tasks         Task[]
+  rounds        CorrectionRound[]
+  artwork       ArtworkVersion[]
+  approvals     ApprovalRecord[]
+  channels      DiscussionChannel[]
+  corrections   CorrectionItem[]
+  authority     AuthorityApplication[]
+  schedules     VehicleSchedule[]
+  production    ProductionOrder[]
+  installation  InstallationOrder[]
+  qcInspections QcInspection[]
+  deliveries    DeliveryRecord[]
 
   @@index([status, serviceTypeId])
   @@index([createdAt])
@@ -547,6 +550,8 @@ model DepartmentStage {
   tasks         Task[]
   production    ProductionOrder[]
   installation  InstallationOrder[]
+  qcInspections QcInspection[]
+  deliveries    DeliveryRecord[]
 
   @@unique([jobWorkflowId, templateStageId, occurrenceNo])
   @@index([status, departmentId])
@@ -1352,4 +1357,126 @@ model OperationLog {
   @@index([productionOrderId])
   @@index([installationOrderId])
   @@map("operation_logs")
+}
+
+// ============================================================ Phase 5
+
+enum QcStatus {
+  DRAFT
+  PASSED
+  FAILED
+}
+
+enum QcResult {
+  PASS
+  FAIL
+  NA
+}
+
+enum DeliveryStatus {
+  PLANNED
+  COMPLETED
+  CANCELLED
+}
+
+/// Versioned QC checklist per service type; inspections copy the item labels.
+model QcChecklistTemplate {
+  id            String   @id @default(uuid(7)) @db.Uuid
+  serviceTypeId String   @map("service_type_id") @db.Uuid
+  name          String   @db.VarChar(100)
+  version       Int
+  isActive      Boolean  @default(true) @map("is_active")
+  createdById   String?  @map("created_by_id") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  serviceType ServiceType               @relation(fields: [serviceTypeId], references: [id], onDelete: Restrict)
+  items       QcChecklistTemplateItem[]
+  inspections QcInspection[]
+
+  @@unique([serviceTypeId, version])
+  @@map("qc_checklist_templates")
+}
+
+model QcChecklistTemplateItem {
+  id               String  @id @default(uuid(7)) @db.Uuid
+  templateId       String  @map("template_id") @db.Uuid
+  sequence         Int
+  label            String  @db.VarChar(300)
+  required         Boolean @default(true)
+  requiresEvidence Boolean @default(false) @map("requires_evidence")
+
+  template QcChecklistTemplate @relation(fields: [templateId], references: [id], onDelete: Restrict)
+
+  @@unique([templateId, sequence])
+  @@map("qc_checklist_template_items")
+}
+
+/// Each inspection (and re-inspection) is its own row; submitted ones never change.
+model QcInspection {
+  id                  String    @id @default(uuid(7)) @db.Uuid
+  jobId               String    @map("job_id") @db.Uuid
+  stageId             String    @map("stage_id") @db.Uuid
+  templateId          String    @map("template_id") @db.Uuid
+  status              QcStatus  @default(DRAFT)
+  inspectorId         String?   @map("inspector_id") @db.Uuid
+  inspectedAt         DateTime? @map("inspected_at") @db.Timestamptz(3)
+  notes               String?   @db.VarChar(5000)
+  defects             String?   @db.VarChar(5000)
+  responsibleStageKey String?   @map("responsible_stage_key") @db.VarChar(50)
+  correctionId        String?   @map("correction_id") @db.Uuid
+  createdById         String?   @map("created_by_id") @db.Uuid
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  job      Job                 @relation(fields: [jobId], references: [id], onDelete: Restrict)
+  stage    DepartmentStage     @relation(fields: [stageId], references: [id], onDelete: Restrict)
+  template QcChecklistTemplate @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  results  QcChecklistResult[]
+
+  @@index([jobId])
+  @@index([stageId])
+  @@index([status])
+  @@map("qc_inspections")
+}
+
+model QcChecklistResult {
+  id               String    @id @default(uuid(7)) @db.Uuid
+  inspectionId     String    @map("inspection_id") @db.Uuid
+  itemId           String    @map("item_id") @db.Uuid
+  sequence         Int
+  label            String    @db.VarChar(300)
+  required         Boolean
+  requiresEvidence Boolean   @map("requires_evidence")
+  result           QcResult?
+  comment          String?   @db.VarChar(1000)
+  fileIds          String[]  @map("file_ids") @db.Uuid
+
+  inspection QcInspection @relation(fields: [inspectionId], references: [id], onDelete: Restrict)
+
+  @@unique([inspectionId, itemId])
+  @@map("qc_checklist_results")
+}
+
+model DeliveryRecord {
+  id            String         @id @default(uuid(7)) @db.Uuid
+  jobId         String         @map("job_id") @db.Uuid
+  stageId       String         @map("stage_id") @db.Uuid
+  plannedAt     DateTime       @map("planned_at") @db.Timestamptz(3)
+  actualAt      DateTime?      @map("actual_at") @db.Timestamptz(3)
+  recipientName String?        @map("recipient_name") @db.VarChar(150)
+  handoverNotes String?        @map("handover_notes") @db.VarChar(5000)
+  notes         String?        @db.VarChar(2000)
+  status        DeliveryStatus @default(PLANNED)
+  fileIds       String[]       @map("file_ids") @db.Uuid
+  completedById String?        @map("completed_by_id") @db.Uuid
+  createdById   String?        @map("created_by_id") @db.Uuid
+  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  job   Job             @relation(fields: [jobId], references: [id], onDelete: Restrict)
+  stage DepartmentStage @relation(fields: [stageId], references: [id], onDelete: Restrict)
+
+  @@index([jobId])
+  @@index([plannedAt])
+  @@map("delivery_records")
 }

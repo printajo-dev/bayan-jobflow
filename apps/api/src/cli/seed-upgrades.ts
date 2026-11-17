@@ -124,6 +124,23 @@ UPGRADES.push(
   },
 );
 
+/** Phase 5: QC inspections and delivery records replace the last interim ticks. */
+function phase5(def: TemplateDef): TemplateDef {
+  return {
+    ...def,
+    stages: def.stages.map((s) => {
+      if (s.key === 'qc_inspection') return dropChecklist(addGates(s, ['quality.passed']), ['QC inspection checklist passed']);
+      if (s.key === 'delivery') return dropChecklist(addGates(s, ['logistics.delivery_completed']), ['Delivery and handover recorded with recipient and evidence']);
+      return s;
+    }),
+  };
+}
+
+UPGRADES.push(
+  { id: '2026-11-p5-vb-template', kind: 'template', template: 'VB', fromVersionNo: 3, notes: 'Phase 5: QC inspections and delivery records are checked automatically.', transform: (d) => phase5(d) },
+  { id: '2026-11-p5-sg-template', kind: 'template', template: 'SG', fromVersionNo: 3, notes: 'Phase 5: QC inspections are checked automatically.', transform: (d) => phase5(d) },
+);
+
 const KEY = 'seed.upgrades';
 
 export async function applyUpgrades(prisma: PrismaClient, upgrades: Upgrade[] = UPGRADES, log: (m: string) => void = () => {}): Promise<void> {

@@ -17,8 +17,8 @@ export const GATES = [
   { key: 'logistics.schedule_confirmed', label: 'Vehicle schedule confirmed', available: true },
   { key: 'production.completed', label: 'All production orders completed', available: true },
   { key: 'installation.completed', label: 'Installation completed with evidence', available: true },
-  { key: 'quality.passed', label: 'Latest QC inspection passed', available: false, phase: 5 },
-  { key: 'logistics.delivery_completed', label: 'Delivery and handover recorded', available: false, phase: 5 },
+  { key: 'quality.passed', label: 'Latest QC inspection passed', available: true },
+  { key: 'logistics.delivery_completed', label: 'Delivery and handover recorded', available: true },
 ] as const;
 
 export type GateKey = (typeof GATES)[number]['key'];
