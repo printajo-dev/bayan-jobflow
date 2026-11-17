@@ -7,11 +7,12 @@ and customer approval, PRO / government approval, vehicle scheduling,
 production, installation, QC, delivery, department discussion channels with
 voice notes, formal corrections, notifications, dashboards and audit history.
 
-**Status:** Phase 5 — sign-in and roles, jobs with the ERP Job Number, versioned
+**Status:** Phase 6 — sign-in and roles, jobs with the ERP Job Number, versioned
 Vehicle Branding and Signage workflows with rework, tasks, artwork versions and
 customer approval, department discussions with voice notes, corrections,
 notifications, PRO approvals, vehicle scheduling, production, installation, QC,
-rework and delivery. Dashboards and reports come in Phase 6. See [CHANGELOG.md](CHANGELOG.md).
+rework and delivery, role dashboards and reports with CSV/Excel export. Phase 7
+(hardening, backups) is next. See [CHANGELOG.md](CHANGELOG.md).
 
 Using JobFlow: [docs/user-guide.md](docs/user-guide.md). API: [docs/api/](docs/api/).
 

@@ -12,10 +12,11 @@ interface NavItem {
 }
 
 const MAIN: NavItem[] = [
-  { to: '/', label: 'Home' },
+  { to: '/', label: 'Dashboard' },
   { to: '/jobs', label: 'Jobs', permission: 'job.view' },
   { to: '/my-work', label: 'My work', permission: 'task.view' },
   { to: '/notifications', label: 'Notifications' },
+  { to: '/reports', label: 'Reports', permission: 'report.view' },
 ];
 
 export const ADMIN_NAV: NavItem[] = [

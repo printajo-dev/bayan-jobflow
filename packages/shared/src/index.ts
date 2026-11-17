@@ -7,3 +7,4 @@ export * from './workflow-types.js';
 export * from './collaboration.js';
 export * from './operations.js';
 export * from './quality.js';
+export * from './reports.js';

@@ -12,3 +12,7 @@
 - Stage changes only happen through the workflow endpoints
   (`/jobs/{id}/stages/{stageId}/complete|hold|resume|return|reopen|complete-with-exception`);
   there is no endpoint that sets a status directly.
+- Reports: `GET /reports` lists the reports the user may run;
+  `GET /reports/{key}?from=YYYY-MM-DD&to=YYYY-MM-DD&group=month|week&format=json|csv|xlsx`
+  runs one (`csv`/`xlsx` need `report.export`). `GET /dashboard` returns the
+  caller's role-aware dashboard.

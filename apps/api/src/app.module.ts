@@ -31,6 +31,8 @@ import { AuthorityService } from './authority/authority.service.js';
 import { OperationsService } from './operations/operations.service.js';
 import { AuthorityController, OperationsController, QualityController } from './operations.controllers.js';
 import { QualityService } from './quality/quality.service.js';
+import { ReportsController } from './reports/reports.controller.js';
+import { ReportsService } from './reports/reports.service.js';
 import { DiscussionsService } from './discussions/discussions.service.js';
 import { TasksService } from './tasks/tasks.service.js';
 import { DesignService } from './design/design.service.js';
@@ -66,8 +68,10 @@ import { CorrectionsController, DesignController, DiscussionsController, TasksCo
     AuthorityController,
     OperationsController,
     QualityController,
+    ReportsController,
   ],
   providers: [
+    ReportsService,
     AuditService,
     OutboxService,
     PrincipalLoader,

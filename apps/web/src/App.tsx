@@ -20,6 +20,7 @@ import { NewJobPage } from './pages/jobs/NewJobPage';
 import { JobPage } from './pages/jobs/JobPage';
 import { MyWorkPage } from './pages/MyWorkPage';
 import { NotificationsPage } from './pages/NotificationsPage';
+import { ReportsPage } from './pages/ReportsPage';
 
 const PASSWORD_PATH = '/account/password';
 
@@ -57,6 +58,7 @@ export const routes = [
               { path: '/jobs/:id', element: <JobPage /> },
             ],
           },
+          { element: <RequirePermission permission="report.view" />, children: [{ path: '/reports', element: <ReportsPage /> }] },
           { element: <RequirePermission permission="job.create" />, children: [{ path: '/jobs/new', element: <NewJobPage /> }] },
           {
             element: <RequirePermission permission="template.manage" />,

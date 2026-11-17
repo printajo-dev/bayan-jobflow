@@ -179,3 +179,33 @@ comment); items marked "photo required" need a photo.
 Logistic plans the delivery on the **Delivery** tab, and after the handover
 presses *Record handover* with the recipient's name, notes and photos or a
 signed handover note. The job then closes.
+
+## Dashboard
+
+The home page shows your own work at the top (open and overdue tasks,
+corrections assigned to you, unread notifications; click a tile to open the
+list). Below it is one queue for each department you belong to: the jobs
+waiting at that department, how long they have been there, whether the stage is
+a rework round, the internal deadline and the customer date (marked *Overdue*
+when passed), plus the department's own counters. Management also sees the
+company overview and every department's queue. The dashboard refreshes every
+minute.
+
+## Reports
+
+Open **Reports** in the menu, choose a report and a date range. The table shows
+the figures; notes under it explain how they are calculated. **Export CSV** and
+**Export Excel** download the same figures (Management and administrators).
+
+| Report | Who can see it | Period applies to |
+|---|---|---|
+| Active jobs by stage | Management, administrators | – (always the current state) |
+| Completed jobs and cycle time | Management, administrators | job closure date |
+| Department workload | everyone with reports, own departments | tasks completed |
+| Employee workload | department leaders (own departments), Management | tasks completed |
+| Design corrections and time to approval | Management, administrators | job creation date |
+| PRO authority approvals | Management, administrators | application creation date |
+| Production and installation progress | Management, administrators | order creation date |
+| QC pass/fail and rework | Management, administrators | inspection date |
+| Vehicle schedule adherence and delivery | Management, administrators | job creation date |
+| Job closure | Management, administrators | job closure date |

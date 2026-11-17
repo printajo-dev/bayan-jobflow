@@ -1,5 +1,36 @@
 # Changelog
 
+## Phase 6 — Dashboards and reports (unreleased)
+
+### Added
+- Role-aware dashboard (the new home page): my open and overdue tasks, my
+  corrections and unread notifications; one queue per department I belong to
+  (jobs at the department with days in stage, rework round, internal deadline,
+  customer date and overdue flag; open, unassigned and overdue tasks; and
+  department counters such as artwork awaiting approval, PRO applications
+  pending or overdue, schedules awaiting confirmation, orders in progress,
+  installations in the next 14 days, jobs waiting for QC). Management and
+  administrators also see the company overview (active jobs, jobs completed in
+  30 days, average cycle time, stages on hold, rework rounds, overdue tasks and
+  open jobs by current stage) and every department queue.
+- Reports page with ten reports: active jobs by stage; completed jobs and cycle
+  time (by week or month); department workload; employee workload; design
+  corrections and time to approval; PRO authority approvals (turnaround and
+  rejection rate); production and installation progress; QC pass/fail and
+  rework (with most frequent defects); vehicle schedule adherence and delivery;
+  job closure after QC/delivery.
+- CSV (UTF-8 with BOM, opens in Excel) and Excel (.xlsx) export, gated by
+  `report.export`. Text that starts with `=`, `+`, `-` or `@` is prefixed with
+  `'` so exported files cannot run spreadsheet formulas.
+- API: `GET /dashboard`, `GET /reports`, `GET /reports/{key}?from&to&group&format`.
+
+### Access
+- Company-wide reports need `report.view` granted globally (Management, System
+  Administrator). Department members with `report.view` see the department
+  workload report for their own departments only. Employee workload is limited
+  to department leaders (their departments) and global viewers. Export needs
+  `report.export`, which only Management and administrators hold by default.
+
 ## Phase 5 — QC, rework, delivery and closure (unreleased)
 
 Built
