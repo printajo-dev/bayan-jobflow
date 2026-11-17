@@ -50,24 +50,29 @@ docker pull -q --platform linux/amd64 "$REDIS_IMAGE"
 log "Saving images"
 docker save -o "$out/images.tar" bayan-jobflow-api:local bayan-jobflow-web:local "$PG_IMAGE" "$REDIS_IMAGE"
 
-log "Downloading Ubuntu 24.04 packages (Docker, Restic, jq, rsync)"
-# Downloaded inside a clean Ubuntu 24.04 container, so the packages and their
-# dependencies match the server's release.
-docker run --rm --platform linux/amd64 "${EXTRA_RUN[@]}" -v "$out/debs:/out" "$UBUNTU_IMAGE" bash -euc '
+log "Downloading Ubuntu 24.04 packages (Docker, Restic, jq, rsync, git)"
+mkdir -p "$work/keys"
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o "$work/keys/docker.asc"
+# Downloaded in a CLEAN Ubuntu 24.04 container, so every dependency that a
+# minimal server might lack is included. Nothing may be installed in it before
+# the download, or those packages' dependencies would be left out.
+docker run --rm --platform linux/amd64 "${EXTRA_RUN[@]}" -v "$out/debs:/out" -v "$work/keys:/keys:ro" "$UBUNTU_IMAGE" bash -euc '
   export DEBIAN_FRONTEND=noninteractive
   apt-get update -qq
-  apt-get install -y -qq --no-install-recommends ca-certificates curl gnupg >/dev/null
-  # Optional extra certificate authority (networks with an HTTPS proxy).
-  if [ -d /extra-ca ]; then cp /extra-ca/*.crt /usr/local/share/ca-certificates/ && update-ca-certificates >/dev/null; fi
-  install -m 0755 -d /etc/apt/keyrings
-  curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+  apt-get install -y -qq --download-only --no-install-recommends \
+    ca-certificates openssl curl git restic jq rsync iptables >/dev/null
+  cp /var/cache/apt/archives/*.deb /out/
+  # Docker packages come from Docker'"'"'s HTTPS repository: certificates are
+  # needed now (already part of the download above).
+  apt-get install -y -qq --no-install-recommends ca-certificates >/dev/null
+  if [ -d /extra-ca ]; then cp /extra-ca/*.crt /usr/local/share/ca-certificates/ && update-ca-certificates >/dev/null 2>&1; fi
+  install -m 0755 -d /etc/apt/keyrings && cp /keys/docker.asc /etc/apt/keyrings/docker.asc
   echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu noble stable" > /etc/apt/sources.list.d/docker.list
   apt-get update -qq
   rm -f /var/cache/apt/archives/*.deb
   apt-get install -y -qq --download-only --no-install-recommends \
-    docker-ce docker-ce-cli containerd.io docker-compose-plugin docker-buildx-plugin \
-    restic jq rsync iptables git openssl curl ca-certificates >/dev/null
-  cp /var/cache/apt/archives/*.deb /out/
+    docker-ce docker-ce-cli containerd.io docker-compose-plugin docker-buildx-plugin >/dev/null
+  cp -n /var/cache/apt/archives/*.deb /out/
   chown -R '"$(id -u):$(id -g)"' /out'
 
 cp deploy/scripts/install-offline.sh "$out/"
