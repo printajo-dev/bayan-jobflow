@@ -1,0 +1,11 @@
+[Unit]
+Description=Monthly JobFlow restore test
+
+[Timer]
+OnCalendar=*-*-01 05:00
+Persistent=true
+RandomizedDelaySec=10min
+Unit=jobflow-restore-test.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,9 @@
+[Unit]
+Description=Bayan JobFlow monthly restore test
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/srv/bayan-jobflow/deploy/scripts/restore.sh test
+Nice=10

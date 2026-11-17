@@ -1,0 +1,237 @@
+import type { GateKey, PermissionKey } from '@jobflow/shared';
+import type { PrismaClient } from '../generated/prisma/client.js';
+import type { Prisma } from '../generated/prisma/client.js';
+import { ensureChannels } from '../discussions/channels.js';
+
+export interface StageDef {
+  key: string;
+  name: string;
+  description: string | null;
+  departmentId: string;
+  gateKeys: string[];
+  checklist: { label: string; required: boolean }[];
+}
+
+export interface TemplateDef {
+  stages: StageDef[];
+  returnRules: { fromKey: string; toKey: string }[];
+}
+
+type Upgrade =
+  | { id: string; kind: 'grants'; role: string; add: PermissionKey[] }
+  | { id: string; kind: 'run'; description: string; run: (prisma: PrismaClient) => Promise<void> }
+  | { id: string; kind: 'template'; template: string; fromVersionNo: number; notes: string; transform: (def: TemplateDef, depts: Map<string, string>) => TemplateDef };
+
+const addGates = (s: StageDef, gates: GateKey[]) => ({ ...s, gateKeys: [...new Set([...s.gateKeys, ...gates])] });
+const dropChecklist = (s: StageDef, labels: string[]) => ({ ...s, checklist: s.checklist.filter((c) => !labels.includes(c.label)) });
+
+/** Phase 3: tasks, corrections and the customer-approval check replace interim checklist ticks. */
+function phase3(def: TemplateDef): TemplateDef {
+  return {
+    ...def,
+    stages: def.stages.map((s) => {
+      let out = addGates(s, ['tasks.complete', 'corrections.closed']);
+      if (s.key === 'design') {
+        out = addGates(out, ['design.customer_approval']);
+        out = dropChecklist(out, [
+          'Final artwork version uploaded',
+          'Customer approval recorded against the exact artwork version',
+          'Artwork / technical drawings finalised',
+          'Required approval evidence recorded',
+        ]);
+      }
+      return out;
+    }),
+  };
+}
+
+/** Phase 4: PRO, vehicle schedule, production and installation records replace interim ticks. */
+function phase4(def: TemplateDef): TemplateDef {
+  const swap: Record<string, { gate: GateKey; drop: string[] }> = {
+    government_approval: { gate: 'authority.all_cleared', drop: ['Every required authority approval is Approved or marked Not Required with a reason'] },
+    vehicle_schedule: { gate: 'logistics.schedule_confirmed', drop: ['Vehicle availability confirmed', 'Schedule date and location confirmed'] },
+    print: { gate: 'production.completed', drop: ['Approved artwork version printed', 'Production details recorded (material, machine, quantity)'] },
+    production: { gate: 'production.completed', drop: ['Fabrication / printing / assembly completed', 'Production completion evidence recorded'] },
+    wrap: { gate: 'installation.completed', drop: ['Vehicle branding installed', 'Installation team and completion photos recorded'] },
+    installation: { gate: 'installation.completed', drop: ['Installation completed on site', 'Site completion evidence recorded'] },
+  };
+  return {
+    ...def,
+    stages: def.stages.map((s) => {
+      const rule = swap[s.key];
+      return rule ? dropChecklist(addGates(s, [rule.gate]), rule.drop) : s;
+    }),
+  };
+}
+
+/**
+ * Changes that later releases make to seeded data. Each runs once (tracked in
+ * system_settings). Template upgrades publish a new version only when the
+ * published version is still the one the upgrade was written for; if an
+ * administrator has already changed the template, the upgrade is skipped and
+ * logged so they can apply it by hand. Running jobs keep their version.
+ */
+export const UPGRADES: Upgrade[] = [
+  { id: '2026-11-p3-admin-discussions', kind: 'grants', role: 'system_admin', add: ['channel.add_participant', 'message.pin', 'message.moderate'] },
+  {
+    id: '2026-11-p3-vb-template',
+    kind: 'template',
+    template: 'VB',
+    fromVersionNo: 1,
+    notes: 'Phase 3: tasks, blocking corrections and recorded customer approval are now checked automatically.',
+    transform: (d) => phase3(d),
+  },
+  {
+    id: '2026-11-p3-sg-template',
+    kind: 'template',
+    template: 'SG',
+    fromVersionNo: 1,
+    notes: 'Phase 3: tasks, blocking corrections and recorded customer approval are now checked automatically.',
+    transform: (d) => phase3(d),
+  },
+];
+
+/** Jobs created before discussions existed get their department channels. */
+async function backfillChannels(prisma: PrismaClient): Promise<void> {
+  const jobs = await prisma.job.findMany({
+    where: { channels: { none: {} } },
+    select: { id: true, workflow: { select: { templateVersion: { select: { stages: { select: { departmentId: true } } } } } } },
+  });
+  for (const j of jobs) {
+    const depts = j.workflow?.templateVersion.stages.map((s) => s.departmentId) ?? [];
+    await prisma.$transaction((tx) => ensureChannels(tx, j.id, depts));
+  }
+}
+
+UPGRADES.push({ id: '2026-11-p3-backfill-channels', kind: 'run', description: 'create discussion channels for existing jobs', run: backfillChannels });
+
+UPGRADES.push(
+  {
+    id: '2026-11-p4-vb-template',
+    kind: 'template',
+    template: 'VB',
+    fromVersionNo: 2,
+    notes: 'Phase 4: authority approvals, confirmed vehicle schedule, production and installation records are checked automatically.',
+    transform: (d) => phase4(d),
+  },
+  {
+    id: '2026-11-p4-sg-template',
+    kind: 'template',
+    template: 'SG',
+    fromVersionNo: 2,
+    notes: 'Phase 4: production and installation records are checked automatically.',
+    transform: (d) => phase4(d),
+  },
+);
+
+/** Phase 5: QC inspections and delivery records replace the last interim ticks. */
+function phase5(def: TemplateDef): TemplateDef {
+  return {
+    ...def,
+    stages: def.stages.map((s) => {
+      if (s.key === 'qc_inspection') return dropChecklist(addGates(s, ['quality.passed']), ['QC inspection checklist passed']);
+      if (s.key === 'delivery') return dropChecklist(addGates(s, ['logistics.delivery_completed']), ['Delivery and handover recorded with recipient and evidence']);
+      return s;
+    }),
+  };
+}
+
+UPGRADES.push(
+  { id: '2026-11-p5-vb-template', kind: 'template', template: 'VB', fromVersionNo: 3, notes: 'Phase 5: QC inspections and delivery records are checked automatically.', transform: (d) => phase5(d) },
+  { id: '2026-11-p5-sg-template', kind: 'template', template: 'SG', fromVersionNo: 3, notes: 'Phase 5: QC inspections are checked automatically.', transform: (d) => phase5(d) },
+);
+
+const KEY = 'seed.upgrades';
+
+export async function applyUpgrades(prisma: PrismaClient, upgrades: Upgrade[] = UPGRADES, log: (m: string) => void = () => {}): Promise<void> {
+  const row = await prisma.systemSetting.findUnique({ where: { key: KEY } });
+  const state = (row?.value as { applied?: string[]; skipped?: string[] } | null) ?? {};
+  const applied = new Set(state.applied ?? []);
+  const skipped = new Set(state.skipped ?? []);
+  const departments = new Map((await prisma.department.findMany()).map((d) => [d.code, d.id]));
+
+  for (const u of upgrades) {
+    if (applied.has(u.id) || skipped.has(u.id)) continue;
+    if (u.kind === 'run') {
+      await u.run(prisma);
+      applied.add(u.id);
+      log(`Upgrade ${u.id}: ${u.description}`);
+      continue;
+    }
+    if (u.kind === 'grants') {
+      const role = await prisma.role.findUnique({ where: { key: u.role } });
+      if (role) {
+        const perms = await prisma.permission.findMany({ where: { key: { in: u.add } } });
+        await prisma.rolePermission.createMany({ data: perms.map((p) => ({ roleId: role.id, permissionId: p.id })), skipDuplicates: true });
+      }
+      applied.add(u.id);
+      log(`Upgrade ${u.id}: granted ${u.add.join(', ')} to ${u.role}`);
+      continue;
+    }
+    const template = await prisma.workflowTemplate.findUnique({ where: { code: u.template } });
+    const published = template ? await prisma.workflowTemplateVersion.findFirst({ where: { templateId: template.id, status: 'PUBLISHED' } }) : null;
+    const draft = template ? await prisma.workflowTemplateVersion.findFirst({ where: { templateId: template.id, status: 'DRAFT' } }) : null;
+    if (!template || !published || published.versionNo !== u.fromVersionNo || draft) {
+      skipped.add(u.id);
+      log(`Upgrade ${u.id}: skipped (template ${u.template} was changed by an administrator; apply by hand if wanted)`);
+      continue;
+    }
+    const def = await loadDefinition(prisma, published.id);
+    await publishDefinition(prisma, template.id, u.transform(def, departments), u.notes);
+    applied.add(u.id);
+    log(`Upgrade ${u.id}: published a new version of ${template.name}`);
+  }
+  const value = { applied: [...applied], skipped: [...skipped] } as Prisma.InputJsonValue;
+  await prisma.systemSetting.upsert({ where: { key: KEY }, create: { key: KEY, value }, update: { value } });
+}
+
+export async function loadDefinition(prisma: PrismaClient, versionId: string): Promise<TemplateDef> {
+  const v = await prisma.workflowTemplateVersion.findUniqueOrThrow({
+    where: { id: versionId },
+    include: {
+      stages: { orderBy: { sequence: 'asc' }, include: { checklist: { orderBy: { sequence: 'asc' } } } },
+      transitions: { include: { fromStage: true, toStage: true } },
+    },
+  });
+  return {
+    stages: v.stages.map((s) => ({
+      key: s.key,
+      name: s.name,
+      description: s.description,
+      departmentId: s.departmentId,
+      gateKeys: s.gateKeys,
+      checklist: s.checklist.map((c) => ({ label: c.label, required: c.required })),
+    })),
+    returnRules: v.transitions.map((t) => ({ fromKey: t.fromStage.key, toKey: t.toStage.key })),
+  };
+}
+
+async function publishDefinition(prisma: PrismaClient, templateId: string, def: TemplateDef, notes: string): Promise<void> {
+  await prisma.$transaction(async (tx) => {
+    const last = await tx.workflowTemplateVersion.findFirst({ where: { templateId }, orderBy: { versionNo: 'desc' } });
+    const version = await tx.workflowTemplateVersion.create({ data: { templateId, versionNo: (last?.versionNo ?? 0) + 1, notes } });
+    const ids = new Map<string, string>();
+    for (const [i, s] of def.stages.entries()) {
+      const stage = await tx.workflowTemplateStage.create({
+        data: {
+          versionId: version.id,
+          sequence: i + 1,
+          key: s.key,
+          name: s.name,
+          description: s.description,
+          departmentId: s.departmentId,
+          gateKeys: s.gateKeys,
+          checklist: { create: s.checklist.map((c, j) => ({ sequence: j + 1, label: c.label, required: c.required })) },
+        },
+      });
+      ids.set(s.key, stage.id);
+    }
+    for (const r of def.returnRules) {
+      if (ids.has(r.fromKey) && ids.has(r.toKey)) {
+        await tx.workflowTemplateTransition.create({ data: { versionId: version.id, fromStageId: ids.get(r.fromKey)!, toStageId: ids.get(r.toKey)! } });
+      }
+    }
+    await tx.workflowTemplateVersion.updateMany({ where: { templateId, status: 'PUBLISHED' }, data: { status: 'RETIRED' } });
+    await tx.workflowTemplateVersion.update({ where: { id: version.id }, data: { status: 'PUBLISHED', publishedAt: new Date() } });
+  });
+}
