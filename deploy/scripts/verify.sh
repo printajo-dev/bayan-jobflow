@@ -10,6 +10,8 @@ fail=0
 check() { if eval "$2" >/dev/null 2>&1; then log "OK    $1"; else log "FAIL  $1"; fail=1; fi; }
 
 check "Docker starts on boot" "systemctl is-enabled docker"
+check "LAN address $BIND_IP is up on this server" "ip -4 -o addr show | grep -q ' $BIND_IP/'"
+check "Web server may start before the network is up" "[[ \$(sysctl -n net.ipv4.ip_nonlocal_bind) == 1 ]]"
 for s in postgres redis api worker caddy; do
   check "service $s running" "[[ \$(docker inspect -f '{{.State.Running}}' \$(dc ps -q $s)) == true ]]"
 done

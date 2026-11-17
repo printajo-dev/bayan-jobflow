@@ -16,7 +16,7 @@ installation and updates (to download Docker, base images and packages).
 
 1. Install Ubuntu Server 24.04 LTS. Create an admin user (not root).
 2. **Give the server a fixed LAN IP**, either in netplan or as a DHCP
-   reservation on the router. Example used below: `192.168.1.50`.
+   reservation on the router. Example used below: `192.168.0.1`.
    Bookmarks and the HTTPS certificate are tied to this address, so it must
    not change.
 3. Update the system and set the time zone:
@@ -119,7 +119,7 @@ enable it under *Settings → General → About → Certificate Trust Settings*.
 **Android tablets**: *Settings → Security → Encryption & credentials → Install
 a certificate → CA certificate*.
 
-Then open `https://192.168.1.50` — there must be no certificate warning.
+Then open `https://192.168.0.1` — there must be no certificate warning.
 
 The root certificate is valid for 10 years and survives restarts and updates as
 long as `/srv/company-data/caddy/data` is kept. If that folder is lost, every PC
@@ -128,36 +128,25 @@ needs the new certificate.
 ## 6. Firewall
 
 Only ports 443 and 80 (redirects to HTTPS) should be reachable, and only from
-the office LAN. PostgreSQL and Redis publish no ports at all.
-
-Docker publishes ports by writing its own iptables rules, which **bypass UFW's
-normal rules**. JobFlow limits this in two ways:
-
-1. Caddy binds only to `BIND_IP` (the LAN address), not to every interface.
-2. Add a `DOCKER-USER` rule so only the LAN subnet reaches published ports.
-   Replace `192.168.1.0/24` with your subnet:
-
-   ```bash
-   sudo ufw allow from 192.168.1.0/24 to any port 22 proto tcp   # SSH from LAN only
-   sudo ufw default deny incoming
-   sudo ufw enable
-   # Docker-published ports: allow the LAN, drop everything else.
-   # (The first rule keeps replies to the server's own outgoing connections,
-   # needed for updates and image builds.)
-   IFACE="$(ip route show default | awk '{print $5}')"
-   sudo iptables -I DOCKER-USER -i "$IFACE" ! -s 192.168.1.0/24 -j DROP
-   sudo iptables -I DOCKER-USER -i "$IFACE" -m conntrack --ctstate ESTABLISHED,RELATED -j RETURN
-   sudo apt install -y iptables-persistent && sudo netfilter-persistent save
-   ```
-
-Verify **from another PC on the LAN**:
+the office network. PostgreSQL and Redis publish no ports at all. Caddy binds
+only to `BIND_IP`, and:
 
 ```bash
-nmap -p 22,80,443,3000,5432,6379 192.168.1.50
+sudo ./deploy/scripts/firewall.sh install      # office network = BIND_IP's /24; or give it, e.g. 192.168.0.0/24
 ```
 
-Expected: 22, 80 and 443 open; 3000, 5432 and 6379 closed or filtered. Do not
-set up port forwarding on the router.
+This allows SSH only from the office network and denies other incoming
+connections (UFW), and adds a rule in Docker's `DOCKER-USER` chain (Docker's
+published ports bypass UFW) so only the office network reaches JobFlow. It
+needs no internet and is re-applied at every boot.
+
+Verify **from another PC on the LAN** (if nmap is available):
+
+```bash
+nmap -p 22,80,443,3000,5432,6379 192.168.0.1
+```
+
+Expected: 22, 80 and 443 open; 3000, 5432 and 6379 closed or filtered.
 
 ## 7. Backups
 

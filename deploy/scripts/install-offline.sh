@@ -68,6 +68,7 @@ Next:
   ./deploy/scripts/install.sh      # first run creates deploy/.env; edit JOBFLOW_HOST and BIND_IP
   ./deploy/scripts/install.sh      # second run starts JobFlow (no build, no internet)
   ./deploy/scripts/create-admin.sh
-  sudo ./deploy/scripts/install-backups.sh
-See docs/install-offline.md.
+  ./deploy/scripts/firewall.sh install
+  ./deploy/scripts/install-backups.sh
+Set the server's fixed LAN address first: docs/install-offline.md, section 2a.
 MSG

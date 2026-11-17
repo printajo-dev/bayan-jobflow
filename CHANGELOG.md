@@ -12,6 +12,20 @@
   `docker compose up -d --scale api=N` spreads the load (sticky live updates);
   `DB_POOL_MAX` sets database connections per API container.
 - Regression tests for the review findings (`test/hardening.e2e-spec.ts`).
+- Office network without a router (server and PCs on one switch, fixed
+  addresses such as `192.168.0.1`): `docs/install-offline.md` §2a covers the
+  server's fixed IP (netplan), PC settings and the 192.168.0.1-router clash.
+  `deploy/scripts/firewall.sh` sets up the firewall with no internet (it
+  replaces the `iptables-persistent` steps) and re-applies it at every boot.
+
+### Fixed (network)
+- The web server no longer fails to start when the server boots before its
+  LAN address is up (switch or cable off): `install.sh` enables
+  `net.ipv4.ip_nonlocal_bind`. Without it Docker refused to start the web
+  container ("cannot assign requested address"); reproduced and verified.
+- Firewall instructions relied on a default route and on downloading
+  `iptables-persistent`, neither of which exists on an offline switch-only
+  network.
 
 ### Fixed
 - Three independent code reviews; every confirmed finding fixed. The full
